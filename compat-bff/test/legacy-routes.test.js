@@ -131,3 +131,17 @@ test("legacy owner accounts map to scoped PROPERTY_OWNER invitations", () => {
   assert.match(propertyService, /if \(principal\.role == "PROPERTY_OWNER"\) filters\.add\("created_by = :createdBy"\)/);
   assert.match(propertyService, /ownerScope", principal\.role == "PROPERTY_OWNER"/);
 });
+
+
+test("property owner membership migration and image access are present", () => {
+  const propertyImages = readFileSync(
+    new URL("../../src/main/kotlin/br/com/imobpro/properties/PropertyImageController.kt", import.meta.url),
+    "utf8",
+  );
+  const migration = readFileSync(
+    new URL("../../src/main/resources/db/migration/V14__property_owner_membership_role.sql", import.meta.url),
+    "utf8",
+  );
+  assert.match(propertyImages, /PROPERTY_OWNER/);
+  assert.match(migration, /PROPERTY_OWNER/);
+});
