@@ -1,6 +1,5 @@
 package br.com.imobpro.auth
 
-import br.com.imobpro.auth.TenantPrincipal
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.springframework.beans.factory.annotation.Value
