@@ -88,7 +88,7 @@ class PublicPortalService(
             .addValue("limit", limit)
         val filters = mutableListOf<String>()
         if (!purpose.isNullOrBlank()) {
-            filters.add("p.purpose = :purpose")
+            filters.add("(p.purpose = :purpose OR p.purpose = 'BOTH')")
             parameters.addValue("purpose", purpose)
         }
         if (!city.isNullOrBlank()) {
@@ -153,7 +153,7 @@ class PublicPortalService(
             JOIN listings l ON l.property_id = p.id AND l.organization_id = p.organization_id
             JOIN organizations o ON o.id = l.organization_id
             WHERE o.slug = ? AND l.public_slug = ? AND l.status = 'PUBLISHED'
-              AND l.channel = 'WEBSITE' AND p.status = 'ACTIVE'
+              AND l.channel = 'WEBSITE' AND o.status = 'ACTIVE' AND p.status = 'ACTIVE'
               AND p.archived_at IS NULL AND pi.id = ?
             """.trimIndent(),
             { rs, _ -> rs.getString("storage_key") to rs.getString("content_type") },
@@ -272,9 +272,9 @@ class PublicPortalService(
             rs.getString("city"),
             rs.getString("state").trim(),
             rs.getString("neighborhood"),
-            rs.getObject("bedrooms") as Int?,
-            rs.getObject("bathrooms") as Int?,
-            rs.getObject("parking_spaces") as Int?,
+            rs.getObject("bedrooms")?.let { (it as Number).toInt() },
+            rs.getObject("bathrooms")?.let { (it as Number).toInt() },
+            rs.getObject("parking_spaces")?.let { (it as Number).toInt() },
             rs.getBigDecimal("built_area"),
             rs.getBigDecimal("land_area"),
             rs.getBigDecimal("sale_price"),
