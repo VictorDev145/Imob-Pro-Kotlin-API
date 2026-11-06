@@ -48,7 +48,10 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
             .addValue("organizationId", principal.organizationId)
             .addValue("offset", offset)
             .addValue("limit", limit)
+            .addValue("createdBy", principal.userId)
+        .addValue("ownerScope", principal.role == "PROPERTY_OWNER")
         val filters = mutableListOf<String>()
+        if (principal.role == "PROPERTY_OWNER") filters.add("created_by = :createdBy")
         if (!city.isNullOrBlank()) {
             filters.add("LOWER(city) = LOWER(:city)")
             parameters.addValue("city", city.trim())
@@ -78,10 +81,13 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
             """
             SELECT * FROM properties
             WHERE id = :id AND organization_id = :organizationId AND archived_at IS NULL
+              AND (:ownerScope = FALSE OR created_by = :createdBy)
             """.trimIndent(),
             MapSqlParameterSource()
                 .addValue("id", propertyId)
-                .addValue("organizationId", principal.organizationId),
+                .addValue("organizationId", principal.organizationId)
+                .addValue("ownerScope", principal.role == "PROPERTY_OWNER")
+                .addValue("createdBy", principal.userId),
             propertyRowMapper(),
         ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
@@ -116,6 +122,7 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
                 rent_price = :rentPrice,
                 updated_at = NOW()
             WHERE id = :id AND organization_id = :organizationId AND archived_at IS NULL
+              AND (:ownerScope = FALSE OR created_by = :createdBy)
             """.trimIndent(),
             parameters,
         )
@@ -130,10 +137,13 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
             UPDATE properties
             SET status = 'ARCHIVED', archived_at = NOW(), updated_at = NOW()
             WHERE id = :id AND organization_id = :organizationId AND archived_at IS NULL
+              AND (:ownerScope = FALSE OR created_by = :createdBy)
             """.trimIndent(),
             MapSqlParameterSource()
                 .addValue("id", propertyId)
-                .addValue("organizationId", principal.organizationId),
+                .addValue("organizationId", principal.organizationId)
+                .addValue("ownerScope", principal.role == "PROPERTY_OWNER")
+                .addValue("createdBy", principal.userId),
         )
         if (updated == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND)
     }
