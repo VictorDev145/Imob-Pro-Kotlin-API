@@ -99,3 +99,13 @@ test("chat compatibility marks incoming messages as read, not outgoing messages"
     /read_at: message\.senderUserId === recipientId \? message\.createdAt : null/,
   );
 });
+
+
+test("invitation links have a first-party acceptance page and CSRF-protected API adapter", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(server, /app\.get\("\/accept-invitation"/);
+  assert.match(server, /app\.post\("\/api\/auth\/invitations\/accept", authLimiter, requireCsrf/);
+  assert.match(server, /apiCall\("\/api\/v1\/auth\/invitations\/accept"/);
+  assert.match(server, /const invitationPage = `<!doctype html>/);
+  assert.match(server, /new URLSearchParams\(location\.search\)\.get\("token"\)/);
+});
