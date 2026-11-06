@@ -19,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.web.client.TestRestTemplate
 import org.springframework.boot.test.web.server.LocalServerPort
+import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
@@ -36,6 +37,9 @@ import java.util.UUID
 class AuthFlowIntegrationTest {
     @Autowired
     private lateinit var rest: TestRestTemplate
+
+    @Autowired
+    private lateinit var jdbc: JdbcTemplate
 
     @LocalServerPort
     private var port: Int = 0
@@ -117,6 +121,11 @@ class AuthFlowIntegrationTest {
         assertEquals(HttpStatus.CREATED, leadCreated.statusCode)
         val lead = leadCreated.body!!
         assertEquals(property.id, lead.propertyId)
+        val queuedAutomationEvents = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM automation_events WHERE trigger_key = 'LEAD_CREATED'",
+            Long::class.java,
+        )
+        assertTrue(queuedAutomationEvents != null && queuedAutomationEvents > 0)
 
         val statusHeaders =
             HttpHeaders().apply {
