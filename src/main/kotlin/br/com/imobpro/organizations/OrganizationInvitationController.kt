@@ -167,11 +167,15 @@ class OrganizationInvitationService(
         val organizationId = invitation[1] as UUID
         val email = invitation[2] as String
         val role = invitation[3] as String
-        val userId = jdbc.query(
-            "SELECT id FROM users WHERE email = ?",
-            { rs, _ -> rs.getObject("id", UUID::class.java) },
+        val existingUser = jdbc.query(
+            "SELECT id, status FROM users WHERE email = ?",
+            { rs, _ -> rs.getObject("id", UUID::class.java) to rs.getString("status") },
             email,
-        ).singleOrNull() ?: run {
+        ).singleOrNull()
+        if (existingUser != null && existingUser.second != "ACTIVE") {
+            throw ResponseStatusException(HttpStatus.FORBIDDEN, "This account is not active")
+        }
+        val userId = existingUser?.first ?: run {
             val name = request.fullName?.trim().orEmpty()
             val password = request.password.orEmpty()
             if (name.isBlank() || password.isBlank() || password.toByteArray(Charsets.UTF_8).size > 72) {
