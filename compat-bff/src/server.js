@@ -389,8 +389,11 @@ app.get("/api/messages", async (req, res) => {
     const conversations = await authenticatedCall(req, "/api/v1/conversations?withUserId=" + encodeURIComponent(withUser));
     if (conversations.status !== 200) return sendApiResult(res, conversations);
     if (!Array.isArray(conversations.data) || !conversations.data.length) return res.json([]);
-    const result = await authenticatedCall(req, "/api/v1/conversations/" + encodeURIComponent(conversations.data[0].id) + "/messages");
+    const conversationId = conversations.data[0].id;
+    const result = await authenticatedCall(req, "/api/v1/conversations/" + encodeURIComponent(conversationId) + "/messages");
     if (result.status !== 200) return sendApiResult(res, result);
+    const markedRead = await authenticatedCall(req, "/api/v1/conversations/" + encodeURIComponent(conversationId) + "/read", { method: "POST" });
+    if (markedRead.status !== 200) return sendApiResult(res, markedRead);
     return res.json((result.data || []).map(message => ({
       id: message.id,
       sender_id: message.senderUserId,
@@ -405,6 +408,7 @@ app.post("/api/messages", requireCsrf, async (req, res) => {
     const body = req.body || {};
     const recipientId = body.recipient_id || body.recipientId;
     if (!recipientId || !body.body) return fail(res, 400, "INVALID_MESSAGE", "Destinatário e mensagem são obrigatórios.");
+    if (String(body.body).trim().length > 2000) return fail(res, 400, "MESSAGE_TOO_LONG", "A mensagem pode ter no máximo 2.000 caracteres.");
     const query = await authenticatedCall(req, "/api/v1/conversations?withUserId=" + encodeURIComponent(recipientId));
     if (query.status !== 200) return sendApiResult(res, query);
     let conversation = Array.isArray(query.data) ? query.data[0] : null;
