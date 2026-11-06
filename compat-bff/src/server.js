@@ -788,6 +788,33 @@ app.patch("/api/me/profile", requireCsrf, async (req, res) => {
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível atualizar o perfil."); }
 });
 
+
+app.post("/api/admin/automations", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const result = await authenticatedCall(req, "/api/v1/automations", {
+      method: "POST",
+      body: {
+        name: body.name,
+        triggerKey: String(body.trigger_key || body.triggerKey || "").toUpperCase(),
+        actionKey: String(body.action_key || body.actionKey || "").toUpperCase(),
+        configuration: body.configuration || {},
+      },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível criar a automação."); }
+});
+
+app.patch("/api/admin/automations/:id", requireCsrf, async (req, res) => {
+  try {
+    const enabled = req.body?.enabled === true || req.body?.enabled === 1 || req.body?.enabled === "1" || req.body?.enabled === "true";
+    const result = await authenticatedCall(req, "/api/v1/automations/" + encodeURIComponent(req.params.id) + "/enabled", {
+      method: "PATCH", body: { enabled },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível atualizar a automação."); }
+});
+
 app.patch("/api/admin/settings", requireCsrf, async (req, res) => {
   try {
     const result = await authenticatedCall(req, "/api/v1/organizations/current/settings", {
