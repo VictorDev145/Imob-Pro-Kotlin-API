@@ -115,11 +115,10 @@ class OrganizationContentService(
         val id = jdbc.query(
             """
             SELECT id FROM site_pages
-            WHERE organization_id = ? AND slug = ?
+            WHERE organization_id = :org AND slug = :slug
             """.trimIndent(),
-            { rs, _ -> rs.getObject("id", UUID::class.java) },
-            principal.organizationId,
-            request.slug,
+            MapSqlParameterSource().addValue("org", principal.organizationId).addValue("slug", request.slug),
+            RowMapper { rs, _ -> rs.getObject("id", UUID::class.java) },
         ).singleOrNull() ?: UUID.randomUUID()
         jdbc.update(
             """
