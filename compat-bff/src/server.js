@@ -750,6 +750,43 @@ app.get("/media/property/:propertyId/:imageId", async (req, res) => {
 });
 
 
+
+app.get("/api/me/profile", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/me/profile");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json({
+      id: result.data.userId,
+      name: result.data.fullName,
+      email: result.data.email,
+      phone: result.data.phone,
+      role: String(result.data.role || "").toLowerCase(),
+    });
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Perfil indisponível."); }
+});
+
+app.patch("/api/me/profile", requireCsrf, async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/me/profile", {
+      method: "PATCH",
+      body: {
+        fullName: req.body?.name || req.body?.fullName,
+        phone: req.body?.phone || null,
+      },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível atualizar o perfil."); }
+});
+
+app.patch("/api/admin/settings", requireCsrf, async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/organizations/current/settings", {
+      method: "PATCH", body: { settings: req.body || {} },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível salvar as configurações."); }
+});
+
 app.get("/api/admin/users", async (req, res) => {
   try {
     const result = await authenticatedCall(req, "/api/v1/organizations/current/members");
