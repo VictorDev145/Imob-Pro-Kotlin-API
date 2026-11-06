@@ -65,11 +65,14 @@ class LeadService(
         offset: Int,
         limit: Int,
         status: String?,
+        assignedToMe: Boolean = false,
     ): LeadPage {
         val parameters = MapSqlParameterSource()
             .addValue("organizationId", principal.organizationId)
             .addValue("offset", offset)
             .addValue("limit", limit)
+            .addValue("assignedToMe", assignedToMe)
+            .addValue("userId", principal.userId)
         val statusFilter = if (status.isNullOrBlank()) {
             ""
         } else {
@@ -80,6 +83,7 @@ class LeadService(
             """
             SELECT * FROM leads
             WHERE organization_id = :organizationId
+              AND (:assignedToMe = FALSE OR assigned_to = :userId)
             $statusFilter
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
