@@ -294,7 +294,7 @@ class AuthFlowIntegrationTest {
                 String::class.java,
             )
         assertEquals(HttpStatus.OK, crossTenantNotifications.statusCode)
-        assertTrue(!crossTenantNotifications.body.orEmpty().contains("Conversa privada"))
+        assertTrue(!crossTenantNotifications.body.orEmpty().contains("LEAD_CREATED"))
 
         val crossTenantAutomations =
             rest.exchange(
