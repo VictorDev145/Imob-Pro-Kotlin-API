@@ -142,24 +142,43 @@ class DashboardAnalyticsService(
         )
 
     fun property(principal: TenantPrincipal, propertyId: UUID): PropertyAnalyticsResponse {
-        val exists = jdbc.query(
+        val identity = jdbc.query(
             """
-            SELECT 1 FROM properties
+            SELECT id, title FROM properties
             WHERE id = :property AND organization_id = :org AND archived_at IS NULL
             """.trimIndent(),
             MapSqlParameterSource().addValue("property", propertyId).addValue("org", principal.organizationId),
-            RowMapper { rs, _ -> rs.getInt(1) },
-        ).isNotEmpty()
-        if (!exists) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+            RowMapper { rs, _ ->
+                PropertyAnalyticsIdentity(
+                    rs.getObject("id", UUID::class.java),
+                    rs.getString("title"),
+                )
+            },
+        ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         val totals = jdbc.query(
             """
-            SELECT COUNT(*) AS total, COUNT(DISTINCT session_hash) AS unique_sessions
-            FROM property_views
-            WHERE organization_id = :org AND property_id = :property
-              AND created_at >= NOW() - INTERVAL '30 days'
+            SELECT
+                (SELECT COUNT(*) FROM property_views
+                 WHERE organization_id = :org AND property_id = :property) AS total,
+                (SELECT COUNT(DISTINCT session_hash) FROM property_views
+                 WHERE organization_id = :org AND property_id = :property) AS unique_sessions,
+                (SELECT COUNT(*) FROM favorites
+                 WHERE organization_id = :org AND property_id = :property) AS favorites,
+                (SELECT COUNT(*) FROM leads
+                 WHERE organization_id = :org AND property_id = :property) AS leads,
+                (SELECT COUNT(*) FROM visits
+                 WHERE organization_id = :org AND property_id = :property) AS visits
             """.trimIndent(),
             MapSqlParameterSource().addValue("org", principal.organizationId).addValue("property", propertyId),
-            RowMapper { rs, _ -> rs.getLong("total") to rs.getLong("unique_sessions") },
+            RowMapper { rs, _ ->
+                listOf(
+                    rs.getLong("total"),
+                    rs.getLong("unique_sessions"),
+                    rs.getLong("favorites"),
+                    rs.getLong("leads"),
+                    rs.getLong("visits"),
+                )
+            },
         ).single()
         val daily = jdbc.query(
             """
