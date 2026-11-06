@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.RowMapper
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import org.springframework.security.access.prepost.PreAuthorize
 import org.springframework.security.core.Authentication
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -24,6 +25,7 @@ import java.util.UUID
 data class CreateConversationRequest(
     @field:NotBlank @field:Size(max = 180) val subject: String,
     val leadId: UUID? = null,
+    val participantUserIds: List<UUID> = emptyList(),
 )
 
 data class SendMessageRequest(
@@ -46,6 +48,17 @@ data class MessageResponse(
     val editedAt: Instant?,
 )
 
+data class ConversationContact(val userId: UUID, val fullName: String, val role: String)
+
+data class AdminMessageResponse(
+    val id: UUID,
+    val conversationId: UUID,
+    val senderUserId: UUID,
+    val senderName: String,
+    val body: String,
+    val createdAt: Instant,
+)
+
 @Service
 class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
     @Transactional
@@ -60,18 +73,35 @@ class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
                 .addValue("lead", request.leadId).addValue("subject", request.subject.trim())
                 .addValue("creator", principal.userId),
         )
-        jdbc.update(
+        val participantIds = (request.participantUserIds + principal.userId).distinct()
+        if (participantIds.size > 21) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "A conversation can have at most 20 invited participants")
+        }
+        val activeParticipants = jdbc.queryForObject(
             """
-            INSERT INTO conversation_members (organization_id, conversation_id, user_id)
-            VALUES (:org, :conversation, :user)
+            SELECT COUNT(*) FROM organization_memberships
+            WHERE organization_id = :org AND user_id IN (:users) AND status = 'ACTIVE'
             """.trimIndent(),
-            MapSqlParameterSource().addValue("org", principal.organizationId)
-                .addValue("conversation", id).addValue("user", principal.userId),
-        )
+            MapSqlParameterSource().addValue("org", principal.organizationId).addValue("users", participantIds),
+            Long::class.java,
+        ) ?: 0L
+        if (activeParticipants != participantIds.size.toLong()) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "One or more participants are not active members of this organization")
+        }
+        participantIds.forEach { participantId ->
+            jdbc.update(
+                """
+                INSERT INTO conversation_members (organization_id, conversation_id, user_id)
+                VALUES (:org, :conversation, :user)
+                """.trimIndent(),
+                MapSqlParameterSource().addValue("org", principal.organizationId)
+                    .addValue("conversation", id).addValue("user", participantId),
+            )
+        }
         return get(principal, id)
     }
 
-    fun list(principal: TenantPrincipal): List<ConversationResponse> =
+    fun list(principal: TenantPrincipal, withUserId: UUID? = null): List<ConversationResponse> =
         jdbc.query(
             """
             SELECT c.id, c.subject, c.status, c.lead_id, c.updated_at
@@ -79,11 +109,75 @@ class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
             JOIN conversation_members cm
               ON cm.conversation_id = c.id AND cm.organization_id = c.organization_id
             WHERE c.organization_id = :org AND cm.user_id = :user
+              AND (:withUserId IS NULL OR EXISTS (
+                  SELECT 1 FROM conversation_members other
+                  WHERE other.organization_id = c.organization_id
+                    AND other.conversation_id = c.id AND other.user_id = :withUserId
+              ))
             ORDER BY c.updated_at DESC
             """.trimIndent(),
             MapSqlParameterSource().addValue("org", principal.organizationId)
-                .addValue("user", principal.userId),
+                .addValue("user", principal.userId).addValue("withUserId", withUserId),
             conversationMapper,
+        )
+
+    fun contacts(principal: TenantPrincipal): List<ConversationContact> =
+        jdbc.query(
+            """
+            SELECT u.id, u.full_name, m.role
+            FROM organization_memberships m
+            JOIN users u ON u.id = m.user_id
+            WHERE m.organization_id = :org AND m.status = 'ACTIVE'
+              AND u.status = 'ACTIVE' AND u.id <> :user
+            ORDER BY CASE m.role WHEN 'AGENT' THEN 0 WHEN 'MANAGER' THEN 1 ELSE 2 END, u.full_name
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", principal.organizationId).addValue("user", principal.userId),
+            RowMapper { rs, _ ->
+                ConversationContact(
+                    rs.getObject("id", UUID::class.java),
+                    rs.getString("full_name"),
+                    rs.getString("role"),
+                )
+            },
+        )
+
+    fun unreadCount(principal: TenantPrincipal): Long =
+        jdbc.queryForObject(
+            """
+            SELECT COUNT(*)
+            FROM messages msg
+            JOIN conversation_members cm
+              ON cm.organization_id = msg.organization_id
+             AND cm.conversation_id = msg.conversation_id
+            WHERE msg.organization_id = :org AND cm.user_id = :user
+              AND msg.sender_user_id <> :user AND msg.deleted_at IS NULL
+              AND msg.created_at > COALESCE(cm.last_read_at, cm.joined_at)
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", principal.organizationId).addValue("user", principal.userId),
+            Long::class.java,
+        ) ?: 0L
+
+    fun adminMessages(principal: TenantPrincipal, limit: Int): List<AdminMessageResponse> =
+        jdbc.query(
+            """
+            SELECT msg.id, msg.conversation_id, msg.sender_user_id,
+                   u.full_name AS sender_name, msg.body, msg.created_at
+            FROM messages msg
+            JOIN users u ON u.id = msg.sender_user_id
+            WHERE msg.organization_id = :org AND msg.deleted_at IS NULL
+            ORDER BY msg.created_at DESC LIMIT :limit
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", principal.organizationId).addValue("limit", limit),
+            RowMapper { rs, _ ->
+                AdminMessageResponse(
+                    rs.getObject("id", UUID::class.java),
+                    rs.getObject("conversation_id", UUID::class.java),
+                    rs.getObject("sender_user_id", UUID::class.java),
+                    rs.getString("sender_name"),
+                    rs.getString("body"),
+                    rs.getTimestamp("created_at").toInstant(),
+                )
+            },
         )
 
     fun get(principal: TenantPrincipal, id: UUID): ConversationResponse =
@@ -179,9 +273,29 @@ class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
 @RestController
 @RequestMapping("/api/v1/conversations")
 class MessagingController(private val service: MessagingService) {
+    @GetMapping("/contacts")
+    fun contacts(authentication: Authentication): List<ConversationContact> =
+        service.contacts(authentication.tenant())
+
+    @GetMapping("/unread")
+    fun unread(authentication: Authentication): Map<String, Long> =
+        mapOf("count" to service.unreadCount(authentication.tenant()))
+
+    @GetMapping("/admin/messages")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER')")
+    fun adminMessages(
+        authentication: Authentication,
+        @org.springframework.web.bind.annotation.RequestParam(defaultValue = "200") limit: Int,
+    ): List<AdminMessageResponse> {
+        if (limit !in 1..200) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        return service.adminMessages(authentication.tenant(), limit)
+    }
+
     @GetMapping
-    fun list(authentication: Authentication): List<ConversationResponse> =
-        service.list(authentication.tenant())
+    fun list(
+        authentication: Authentication,
+        @org.springframework.web.bind.annotation.RequestParam(required = false) withUserId: UUID?,
+    ): List<ConversationResponse> = service.list(authentication.tenant(), withUserId)
 
     @PostMapping
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.CREATED)
