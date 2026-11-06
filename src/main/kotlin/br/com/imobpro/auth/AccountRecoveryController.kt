@@ -21,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
+import java.util.UUID
 
 data class ForgotPasswordRequest(
     @field:Email @field:NotBlank @field:Size(max = 254) val email: String,
@@ -36,8 +37,8 @@ class AccountRecoveryService(
     private val jdbc: JdbcTemplate,
     private val passwordEncoder: PasswordEncoder,
     private val mailSender: JavaMailSender,
-    @Value("${app.public-base-url:http://localhost:3000}") private val publicBaseUrl: String,
-    @Value("${spring.mail.username:}") private val mailUsername: String,
+    @Value("\${app.public-base-url:http://localhost:3000}") private val publicBaseUrl: String,
+    @Value("\${spring.mail.username:}") private val mailUsername: String,
 ) {
     private val random = SecureRandom()
 
