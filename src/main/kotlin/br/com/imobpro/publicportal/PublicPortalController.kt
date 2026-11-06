@@ -120,6 +120,27 @@ class PublicPortalService(
         return PublicListingPage(rows.map { it.copy(images = images(organizationSlug, it.id)) }, offset, limit)
     }
 
+    fun getById(organizationSlug: String, listingId: UUID): PublicListing {
+        validateOrganization(organizationSlug)
+        val row = jdbc.query(
+            """
+            SELECT l.id, l.public_slug, l.title, l.description,
+                   p.property_type, p.purpose, p.city, p.state, p.neighborhood,
+                   p.bedrooms, p.bathrooms, p.parking_spaces, p.built_area, p.land_area,
+                   p.sale_price, p.rent_price, l.published_at
+            FROM listings l
+            JOIN properties p ON p.id = l.property_id AND p.organization_id = l.organization_id
+            JOIN organizations o ON o.id = l.organization_id
+            WHERE o.slug = :org AND l.id = :id AND o.status = 'ACTIVE'
+              AND l.status = 'PUBLISHED' AND l.channel = 'WEBSITE'
+              AND p.status = 'ACTIVE' AND p.archived_at IS NULL
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", organizationSlug).addValue("id", listingId),
+            listingMapper,
+        ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        return row.copy(images = images(organizationSlug, row.id))
+    }
+
     fun get(organizationSlug: String, listingSlug: String): PublicListing {
         validateOrganization(organizationSlug)
         val row = jdbc.query(
@@ -316,6 +337,12 @@ class PublicPortalController(private val service: PublicPortalService) {
         }
         return service.list(organizationSlug, offset, limit, purpose, city)
     }
+
+    @GetMapping("/listings/by-id/{listingId}")
+    fun getById(
+        @PathVariable organizationSlug: String,
+        @PathVariable listingId: UUID,
+    ): PublicListing = service.getById(organizationSlug, listingId)
 
     @GetMapping("/listings/{listingSlug}")
     fun get(
