@@ -5,7 +5,6 @@ import br.com.imobpro.leads.LeadResponse
 import br.com.imobpro.leads.UpdateLeadStatusRequest
 import br.com.imobpro.properties.PropertyResponse
 import br.com.imobpro.properties.SavePropertyRequest
-import java.util.UUID
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -24,6 +23,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
 import org.testcontainers.junit.jupiter.Container
 import org.testcontainers.junit.jupiter.Testcontainers
+import java.util.UUID
 
 @Testcontainers(disabledWithoutDocker = true)
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
