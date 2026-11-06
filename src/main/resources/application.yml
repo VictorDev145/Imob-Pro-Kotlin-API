@@ -35,3 +35,14 @@ springdoc:
 logging:
   level:
     org.hibernate.SQL: INFO
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 210MB
+imobpro:
+  storage:
+    local:
+      root: ${IMOBPRO_STORAGE_ROOT:./var/imobpro/uploads}
+app:
+  public-base-url: ${APP_PUBLIC_BASE_URL:http://localhost:3000}
