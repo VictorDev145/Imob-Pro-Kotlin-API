@@ -34,6 +34,7 @@ const definitions = [
   ["GET", /^\/api\/admin\/properties$/, "/api/v1/properties"],
   ["PATCH", /^\/api\/admin\/properties\/([^/]+)$/, "/api/v1/properties/$1"],
   ["POST", /^\/api\/admin\/properties\/([^/]+)\/images$/, "/api/v1/properties/$1/images"],
+  ["POST", /^\/api\/owner\/properties\/([^/]+)\/images$/, "/api/v1/properties/$1/images"],
   ["GET", /^\/api\/admin\/leads$/, "/api/v1/leads"],
   ["PATCH", /^\/api\/admin\/leads\/([^/]+)$/, "/api/v1/leads/$1"],
   ["POST", /^\/api\/auth\/change-password$/, "/api/v1/me/password"],
