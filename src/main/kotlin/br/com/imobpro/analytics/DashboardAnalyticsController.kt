@@ -96,7 +96,7 @@ class DashboardAnalyticsService(
                  WHERE organization_id = :org AND status = 'ACTIVE') AS active_members,
                 (SELECT COUNT(*) FROM leads WHERE organization_id = :org) AS leads,
                 (SELECT COUNT(*) FROM organization_memberships
-                 WHERE organization_id = :org AND status = 'ACTIVE' AND role = 'OWNER') AS owners,
+                 WHERE organization_id = :org AND status = 'ACTIVE' AND role = 'PROPERTY_OWNER') AS owners,
                 (SELECT COUNT(*) FROM organization_memberships
                  WHERE organization_id = :org AND status = 'ACTIVE' AND role = 'CUSTOMER') AS customers,
                 (SELECT COUNT(*) FROM organization_memberships
