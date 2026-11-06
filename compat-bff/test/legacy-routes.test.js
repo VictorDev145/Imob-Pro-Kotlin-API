@@ -117,6 +117,14 @@ test("legacy owner accounts map to scoped PROPERTY_OWNER invitations", () => {
     new URL("../../src/main/kotlin/br/com/imobpro/properties/PropertyService.kt", import.meta.url),
     "utf8",
   );
+  const propertyImages = readFileSync(
+    new URL("../../src/main/kotlin/br/com/imobpro/properties/PropertyImageController.kt", import.meta.url),
+    "utf8",
+  );
+  const membershipMigration = readFileSync(
+    new URL("../../src/main/resources/db/migration/V14__property_owner_membership_role.sql", import.meta.url),
+    "utf8",
+  );
   assert.match(server, /owner: "PROPERTY_OWNER"/);
   assert.match(server, /PROPERTY_OWNER" \? "owner"/);
   assert.match(server, /body: \{ email: body\.email, role \}/);
