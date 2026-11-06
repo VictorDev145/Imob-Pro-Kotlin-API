@@ -74,3 +74,10 @@ test("activity compatibility adapter restores the legacy audit fields", () => {
   }
   assert.match(server, /dashboard\/activity\?limit=100/);
 });
+
+test("message compatibility preserves legacy read and length behavior", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(server, /conversations\/" \+ encodeURIComponent\(conversationId\) \+ "\/read/);
+  assert.match(server, /MESSAGE_TOO_LONG/);
+  assert.match(server, /length > 2000/);
+});
