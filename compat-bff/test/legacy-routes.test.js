@@ -107,7 +107,12 @@ test("invitation links have a first-party acceptance page and CSRF-protected API
   assert.match(server, /app\.post\("\/api\/auth\/invitations\/accept", authLimiter, requireCsrf/);
   assert.match(server, /apiCall\("\/api\/v1\/auth\/invitations\/accept"/);
   assert.match(server, /const invitationPage = `<!doctype html>/);
-  assert.match(server, /new URLSearchParams\(location\.search\)\.get\("token"\)/);
+  assert.match(server, /new URLSearchParams\\(location\\.search\\)\\.get\\("token"\\)/);
+  const invitationController = readFileSync(
+    new URL("../../src/main/kotlin/br/com/imobpro/organizations/OrganizationInvitationController.kt", import.meta.url),
+    "utf8",
+  );
+  assert.match(invitationController, /app\.public-base-url:http:\/\/localhost:3100/);
 });
 
 
