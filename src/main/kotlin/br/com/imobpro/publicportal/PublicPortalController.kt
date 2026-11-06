@@ -129,13 +129,12 @@ class PublicPortalService(
             FROM listings l
             JOIN properties p ON p.id = l.property_id AND p.organization_id = l.organization_id
             JOIN organizations o ON o.id = l.organization_id
-            WHERE o.slug = ? AND l.public_slug = ? AND o.status = 'ACTIVE'
+            WHERE o.slug = :org AND l.public_slug = :slug AND o.status = 'ACTIVE'
               AND l.status = 'PUBLISHED' AND l.channel = 'WEBSITE'
               AND p.status = 'ACTIVE' AND p.archived_at IS NULL
             """.trimIndent(),
+            MapSqlParameterSource().addValue("org", organizationSlug).addValue("slug", listingSlug),
             listingMapper,
-            organizationSlug,
-            listingSlug,
         ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         return row.copy(images = images(organizationSlug, row.id))
     }
@@ -152,14 +151,13 @@ class PublicPortalService(
             JOIN properties p ON p.id = pi.property_id AND p.organization_id = pi.organization_id
             JOIN listings l ON l.property_id = p.id AND l.organization_id = p.organization_id
             JOIN organizations o ON o.id = l.organization_id
-            WHERE o.slug = ? AND l.public_slug = ? AND l.status = 'PUBLISHED'
+            WHERE o.slug = :org AND l.public_slug = :slug AND l.status = 'PUBLISHED'
               AND l.channel = 'WEBSITE' AND o.status = 'ACTIVE' AND p.status = 'ACTIVE'
-              AND p.archived_at IS NULL AND pi.id = ?
+              AND p.archived_at IS NULL AND pi.id = :image
             """.trimIndent(),
-            { rs, _ -> rs.getString("storage_key") to rs.getString("content_type") },
-            organizationSlug,
-            listingSlug,
-            imageId,
+            MapSqlParameterSource().addValue("org", organizationSlug)
+                .addValue("slug", listingSlug).addValue("image", imageId),
+            RowMapper { rs, _ -> rs.getString("storage_key") to rs.getString("content_type") },
         ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         val target = storageRoot.resolve(row.first).normalize()
         if (!target.startsWith(storageRoot) || !Files.isRegularFile(target)) {
@@ -177,21 +175,21 @@ class PublicPortalService(
             JOIN organization_memberships m
               ON m.organization_id = o.id AND m.role = 'OWNER' AND m.status = 'ACTIVE'
             LEFT JOIN listings l
-              ON l.organization_id = o.id AND l.public_slug = ?
+              ON l.organization_id = o.id AND l.public_slug = :listingSlug
              AND l.status = 'PUBLISHED' AND l.channel = 'WEBSITE'
-            WHERE o.slug = ? AND o.status = 'ACTIVE'
+            WHERE o.slug = :orgSlug AND o.status = 'ACTIVE'
             ORDER BY m.created_at
             LIMIT 1
             """.trimIndent(),
-            { rs, _ ->
+            MapSqlParameterSource().addValue("listingSlug", request.listingSlug)
+                .addValue("orgSlug", organizationSlug),
+            RowMapper { rs, _ ->
                 Triple(
                     rs.getObject("organization_id", UUID::class.java),
                     rs.getObject("owner_id", UUID::class.java),
                     rs.getObject("property_id", UUID::class.java),
                 )
             },
-            request.listingSlug,
-            organizationSlug,
         ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         if (request.listingSlug != null && context.third == null) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Published listing not found")
@@ -201,28 +199,30 @@ class PublicPortalService(
             """
             INSERT INTO leads (
                 id, organization_id, created_by, full_name, email, phone, source, status, message, property_id
-            ) VALUES (?, ?, ?, ?, ?, ?, 'WEBSITE', 'NEW', ?, ?)
+            ) VALUES (:id, :org, :creator, :name, :email, :phone, 'WEBSITE', 'NEW', :message, :property)
             """.trimIndent(),
-            leadId,
-            context.first,
-            context.second,
-            request.fullName.trim(),
-            request.email?.trim()?.lowercase(),
-            request.phone.trim(),
-            request.message,
-            context.third,
+            MapSqlParameterSource()
+                .addValue("id", leadId)
+                .addValue("org", context.first)
+                .addValue("creator", context.second)
+                .addValue("name", request.fullName.trim())
+                .addValue("email", request.email?.trim()?.lowercase())
+                .addValue("phone", request.phone.trim())
+                .addValue("message", request.message)
+                .addValue("property", context.third),
         )
         jdbc.update(
             """
             INSERT INTO notifications (organization_id, user_id, type, title, body, resource_type, resource_id)
             SELECT organization_id, user_id, 'LEAD_CREATED', 'Novo contato pelo site',
-                   ?, 'LEAD', ?
+                   :body, 'LEAD', :lead
             FROM organization_memberships
-            WHERE organization_id = ? AND role IN ('OWNER', 'ADMIN') AND status = 'ACTIVE'
+            WHERE organization_id = :org AND role IN ('OWNER', 'ADMIN') AND status = 'ACTIVE'
             """.trimIndent(),
-            "Novo contato de ${request.fullName.trim()}",
-            leadId,
-            context.first,
+            MapSqlParameterSource()
+                .addValue("body", "Novo contato de ${request.fullName.trim()}")
+                .addValue("lead", leadId)
+                .addValue("org", context.first),
         )
     }
 
@@ -233,11 +233,12 @@ class PublicPortalService(
             FROM property_images pi
             JOIN listings l ON l.property_id = pi.property_id AND l.organization_id = pi.organization_id
             JOIN organizations o ON o.id = l.organization_id
-            WHERE o.slug = ? AND l.id = ? AND l.status = 'PUBLISHED'
-              AND l.channel = 'WEBSITE'
+            WHERE o.slug = :org AND l.id = :listing AND l.status = 'PUBLISHED'
+              AND l.channel = 'WEBSITE' AND o.status = 'ACTIVE'
             ORDER BY pi.position, pi.created_at
             """.trimIndent(),
-            { rs, _ ->
+            MapSqlParameterSource().addValue("org", organizationSlug).addValue("listing", listingId),
+            RowMapper { rs, _ ->
                 val slug = rs.getString("public_slug")
                 val id = rs.getObject("id", UUID::class.java)
                 PublicImage(
@@ -248,15 +249,13 @@ class PublicPortalService(
                     "/api/v1/public/$organizationSlug/listings/$slug/images/$id",
                 )
             },
-            organizationSlug,
-            listingId,
         )
 
     private fun validateOrganization(slug: String) {
         val exists = jdbc.query(
-            "SELECT 1 FROM organizations WHERE slug = ? AND status = 'ACTIVE'",
-            { rs, _ -> rs.getInt(1) },
-            slug,
+            "SELECT 1 FROM organizations WHERE slug = :slug AND status = 'ACTIVE'",
+            MapSqlParameterSource().addValue("slug", slug),
+            RowMapper { rs, _ -> rs.getInt(1) },
         ).isNotEmpty()
         if (!exists) throw ResponseStatusException(HttpStatus.NOT_FOUND)
     }
