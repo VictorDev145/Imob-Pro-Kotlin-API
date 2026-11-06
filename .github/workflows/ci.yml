@@ -23,5 +23,7 @@ jobs:
         run: gradle --no-daemon clean test bootJar
       - name: Check Kotlin formatting
         run: gradle --no-daemon ktlintCheck
+      - name: Validate legacy migration exporter
+        run: python3 -m py_compile scripts/legacy-migration/export_sqlite.py && python3 scripts/legacy-migration/export_sqlite.py --help
       - name: Build Docker image
         run: docker build -t imob-pro-kotlin-api:ci .
