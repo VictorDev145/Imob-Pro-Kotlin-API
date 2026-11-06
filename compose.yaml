@@ -66,6 +66,18 @@ services:
       timeout: 5s
       retries: 10
       start_period: 40s
+  legacy-web:
+    build:
+      context: ./web
+    container_name: imob-pro-legacy-web
+    restart: unless-stopped
+    expose:
+      - "80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   compat-bff:
     build:
       context: ./compat-bff
@@ -86,7 +98,7 @@ services:
       REDIS_URL: redis://:${REDIS_PASSWORD:-development-only-redis-password}@redis:6379
       SESSION_SECRET: ${BFF_SESSION_SECRET:-development-only-change-this-session-secret-32}
       PUBLIC_ORGANIZATION_SLUG: ${PUBLIC_ORGANIZATION_SLUG:-}
-      LEGACY_WEB_URL: ${LEGACY_WEB_URL:-http://host.docker.internal:3000}
+      LEGACY_WEB_URL: ${LEGACY_WEB_URL:-http://legacy-web:80}
       TRUST_PROXY: ${BFF_TRUST_PROXY:-false}
     ports:
       - "${BFF_PORT:-3100}:3100"
