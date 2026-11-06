@@ -4,17 +4,40 @@ services:
     container_name: imob-pro-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_DB: imobpro
-      POSTGRES_USER: imobpro
-      POSTGRES_PASSWORD: imobpro_dev
+      POSTGRES_DB: ${POSTGRES_DB:-imobpro}
+      POSTGRES_USER: ${POSTGRES_USER:-imobpro}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-imobpro_dev}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - imobpro_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U imobpro -d imobpro"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-imobpro} -d ${POSTGRES_DB:-imobpro}"]
       interval: 5s
       timeout: 5s
       retries: 10
+  api:
+    build: .
+    container_name: imob-pro-kotlin-api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-imobpro}
+      DB_USERNAME: ${POSTGRES_USER:-imobpro}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-imobpro_dev}
+      SERVER_PORT: 8080
+      IMOBPRO_STORAGE_ROOT: /var/lib/imobpro/uploads
+      APP_PUBLIC_BASE_URL: ${APP_PUBLIC_BASE_URL:-http://localhost:8080}
+      SPRING_MAIL_HOST: ${SMTP_HOST:-}
+      SPRING_MAIL_PORT: ${SMTP_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SMTP_USER:-}
+      SPRING_MAIL_PASSWORD: ${SMTP_PASS:-}
+    ports:
+      - "${API_PORT:-8080}:8080"
+    volumes:
+      - imobpro_uploads:/var/lib/imobpro/uploads
 volumes:
   imobpro_postgres_data:
+  imobpro_uploads:
