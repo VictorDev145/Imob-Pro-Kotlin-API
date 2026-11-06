@@ -106,6 +106,14 @@ class ProfileAndPrivacyService(private val jdbc: NamedParameterJdbcTemplate) {
 
     fun export(principal: TenantPrincipal): Map<String, Any?> {
         val profile = profile(principal)
+        val user = mapOf(
+            "id" to profile.userId,
+            "name" to profile.fullName,
+            "email" to profile.email,
+            "phone" to profile.phone,
+            "role" to profile.role,
+            "created_at" to profile.createdAt,
+        )
         val favorites = jdbc.queryForList(
             """
             SELECT property_id, created_at FROM favorites
@@ -117,19 +125,29 @@ class ProfileAndPrivacyService(private val jdbc: NamedParameterJdbcTemplate) {
         )
         val searches = jdbc.queryForList(
             """
-            SELECT id, name, criteria::text AS criteria, alerts_enabled, created_at
+            SELECT id, name, criteria::text AS filters_json,
+                   CASE WHEN alerts_enabled THEN 'instant' ELSE 'off' END AS frequency,
+                   created_at
             FROM saved_searches WHERE organization_id = :org AND user_id = :user
             ORDER BY created_at DESC
             """.trimIndent(),
             MapSqlParameterSource().addValue("org", principal.organizationId)
                 .addValue("user", principal.userId),
         )
+        val collections = jdbc.queryForList(
+            """
+            SELECT id, user_id, name, description, created_at, updated_at
+            FROM collections WHERE organization_id = :org AND user_id = :user
+            ORDER BY created_at DESC
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", principal.organizationId)
+                .addValue("user", principal.userId),
+        )
         return mapOf(
-            "exportedAt" to Instant.now(),
-            "profile" to profile,
-            "organizationId" to principal.organizationId,
+            "user" to user,
             "favorites" to favorites,
-            "savedSearches" to searches,
+            "saved_searches" to searches,
+            "collections" to collections,
         )
     }
 
