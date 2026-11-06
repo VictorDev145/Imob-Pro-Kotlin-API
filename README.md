@@ -100,6 +100,8 @@ O Compose sobe PostgreSQL e API, com volume persistente para o banco e os arquiv
 | GET/POST | /api/v1/conversations/{id}/messages | Ler/enviar mensagens |
 | GET/PATCH | /api/v1/notifications | Consultar/atualizar notificações |
 | GET/POST | /api/v1/automations | Gerir regras de automação |
+| GET | /api/v1/automations/events | Monitorar eventos do outbox |
+| POST | /api/v1/automations/events/{eventId}/retry | Reprocessar evento com falha |
 | GET | /api/v1/dashboard/summary | Indicadores do dashboard |
 | GET | /api/v1/analytics/properties/{propertyId} | Visualizações do imóvel |
 | GET/POST | /api/v1/me/collections | Listar/criar coleções |
