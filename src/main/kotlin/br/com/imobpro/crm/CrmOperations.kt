@@ -121,15 +121,17 @@ class CrmOperationsService(
         return getTask(principal, id)
     }
 
-    fun listTasks(principal: TenantPrincipal, offset: Int, limit: Int): CrmPage<TaskResponse> {
+    fun listTasks(principal: TenantPrincipal, offset: Int, limit: Int, assignedToMe: Boolean = false): CrmPage<TaskResponse> {
         val items = jdbc.query(
             """
             SELECT * FROM tasks WHERE organization_id = :org
+              AND (:assignedToMe = FALSE OR assigned_to = :user)
             ORDER BY CASE status WHEN 'OPEN' THEN 0 WHEN 'IN_PROGRESS' THEN 1 ELSE 2 END,
                 due_at NULLS LAST, created_at DESC
             LIMIT :limit OFFSET :offset
             """.trimIndent(),
             MapSqlParameterSource().addValue("org", principal.organizationId)
+                .addValue("user", principal.userId).addValue("assignedToMe", assignedToMe)
                 .addValue("limit", limit).addValue("offset", offset),
             taskMapper,
         )
@@ -289,7 +291,8 @@ class CrmOperationsController(private val service: CrmOperationsService) {
         authentication: Authentication,
         @RequestParam(defaultValue = "0") @Min(0) offset: Int,
         @RequestParam(defaultValue = "50") @Min(1) @Max(100) limit: Int,
-    ): CrmPage<TaskResponse> = service.listTasks(authentication.tenant(), offset, limit)
+        @RequestParam(defaultValue = "false") assignedToMe: Boolean,
+    ): CrmPage<TaskResponse> = service.listTasks(authentication.tenant(), offset, limit, assignedToMe)
 
     @PostMapping("/tasks")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
