@@ -52,10 +52,18 @@ data class ActivityResponse(
 data class DailyViewCount(val date: String, val views: Long)
 
 data class PropertyAnalyticsResponse(
-    val propertyId: UUID,
-    val totalViews: Long,
-    val uniqueSessions: Long,
+    val property: PropertyAnalyticsIdentity,
+    val total: Long,
+    val unique: Long,
+    val favorites: Long,
+    val leads: Long,
+    val visits: Long,
     val dailyViews: List<DailyViewCount>,
+)
+
+data class PropertyAnalyticsIdentity(
+    val id: UUID,
+    val title: String,
 )
 
 data class PublicViewRequest(
@@ -164,7 +172,15 @@ class DashboardAnalyticsService(
             MapSqlParameterSource().addValue("org", principal.organizationId).addValue("property", propertyId),
             RowMapper { rs, _ -> DailyViewCount(rs.getString("view_date"), rs.getLong("views")) },
         )
-        return PropertyAnalyticsResponse(propertyId, totals.first, totals.second, daily)
+        return PropertyAnalyticsResponse(
+            property = identity,
+            total = totals[0],
+            unique = totals[1],
+            favorites = totals[2],
+            leads = totals[3],
+            visits = totals[4],
+            dailyViews = daily,
+        )
     }
 }
 
