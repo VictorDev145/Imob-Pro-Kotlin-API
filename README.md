@@ -1,92 +1,142 @@
 # Imob-Pro Kotlin API
 
-Backend do Imob-Pro em Kotlin + Spring Boot, com arquitetura multiempresa e isolamento por organização.
+Backend multiempresa do Imob-Pro, construído em Kotlin + Spring Boot, com PostgreSQL, autenticação por tokens e isolamento de dados por organização.
 
-> **Estado:** fundação, autenticação, gestão básica de membros e inventário de imóveis em implementação. Não declarar produção pronta até concluir os módulos, revisar segurança e executar os testes de integração.
+> **Estado:** backend em evolução, com os principais domínios operacionais e endpoints públicos iniciais. Ainda não é uma migração concluída nem um deploy de produção. A interface HTML/JS legada permanece preservada no repositório original e a integração completa com ela ainda está pendente.
 
 ## Stack
 - Kotlin 2.2.21 / Java 21 / Spring Boot 3.5.7
-- Spring Web, Validation, Security, Data JPA e Actuator
+- Spring Web, Validation, Security, Data JPA, JDBC e Actuator
 - PostgreSQL 17 + Flyway
-- springdoc OpenAPI
+- Spring Mail + springdoc OpenAPI
 - JUnit 5, MockK e Testcontainers
 - Gradle Kotlin DSL, ktlint, Detekt e GitHub Actions
 
 ## Executar localmente
-1. Instale JDK 21, Gradle 8.14+ e Docker Desktop.
-2. Inicie o banco: `docker compose up -d postgres`.
-3. Execute: `gradle bootRun`.
-4. Verifique `http://localhost:8080/api/v1/health`, `/actuator/health` e `/swagger-ui.html`.
 
-As credenciais do Compose são exclusivamente para desenvolvimento. Não as reutilize em produção.
+### Apenas PostgreSQL + API via Gradle
+1. Instale JDK 21, Gradle 8.14+ e Docker Desktop.
+2. Configure as variáveis de ambiente a partir de `.env.example`.
+3. Inicie o banco: `docker compose up -d postgres`.
+4. Execute: `gradle bootRun`.
+5. Verifique `http://localhost:8080/api/v1/health`, `/actuator/health` e `/swagger-ui.html`.
+
+### Stack completa em Docker
+`docker compose up --build -d`
+
+O Compose sobe PostgreSQL e API, com volume persistente para o banco e os arquivos enviados. Credenciais padrão do Compose são apenas para desenvolvimento; altere todos os segredos antes de qualquer ambiente compartilhado.
 
 ## Funcionalidades implementadas
-### Autenticação
-- Registro inicial de organização e OWNER.
-- Login, logout e renovação de tokens.
-- Senhas BCrypt; tokens aleatórios opacos com hashes persistidos.
-- Principal de segurança inclui usuário, organização e papel.
 
-### Organizações e membros
-- Consultar organização atual e listar membros.
-- Atualizar papéis e remover membros logicamente.
-- Proteção de operações administrativas por papel.
+### Identidade e organização
+- Registro inicial de organização e usuário OWNER.
+- Login, logout, refresh com rotação de refresh token e seleção de organização.
+- BCrypt; access/refresh tokens opacos e armazenados somente como hash.
+- Recuperação de senha por e-mail com token de uso único e expiração.
+- Verificação de e-mail por token.
+- Convites de organização por e-mail, aceitação, listagem e revogação.
+- Gestão de membros, papéis e remoção lógica.
 
-### Imóveis e anúncios
-- CRUD de imóveis com paginação, filtros e arquivamento lógico.
-- Cadastro e moderação de anúncios/publicações por canal (site, portal, social e interno).
-- Estrutura de metadados para imagens com chave de armazenamento por tenant; o adaptador real de storage ainda precisa ser conectado.
+### Imóveis e publicação
+- CRUD tenant-scoped de imóveis, paginação, filtros e arquivamento.
+- Upload de até 20 imagens por chamada, PNG/JPEG/WebP, limite de 10 MB por imagem, chave de storage aleatória e download autenticado.
+- Armazenamento local configurável, fora da pasta pública, com volume Docker persistente.
+- Anúncios por canal com fluxo de rascunho/publicação/pausa/arquivamento.
+- Portal público por slug da organização, com listagem, detalhe, imagens e captura de leads.
 
-### CRM operacional
-- Leads com status, atribuição e vínculo tenant-safe a imóveis.
-- Tarefas com prioridade, prazo, responsável, lead e imóvel.
-- Agendamento de visitas com duração, responsável, lead e imóvel.
-- Log de atividades para eventos operacionais.
-- Caixa de notificações por usuário, leitura individual e leitura em lote.
-- Chaves estrangeiras compostas impedem associações entre organizações.
+### CRM e colaboração
+- Leads, status, atribuição e vínculo tenant-safe a imóveis.
+- Tarefas e visitas com responsável, prazo/agendamento, prioridade e status.
+- Caixa de notificações por usuário, leitura individual e em lote.
+- Conversas e mensagens limitadas aos participantes cadastrados.
+- Favoritos e buscas salvas por usuário/organização.
+- Perfil, exportação de dados e solicitações de privacidade.
+- Páginas e configurações básicas do site por organização.
+
+### Automação e análise
+- Cadastro, ativação e remoção de regras de automação.
+- Outbox transacional e worker agendado para ações de criação de tarefa e notificações.
+- Resumo do dashboard, atividade e visualizações por imóvel.
+- Registro de visualizações públicas sem armazenar IP ou session key em texto puro.
 
 ## Endpoints principais
+
 | Método | Caminho | Descrição |
 |---|---|---|
-| POST | /api/v1/auth/register | Criar organização e usuário OWNER |
+| POST | /api/v1/auth/register | Criar organização e OWNER |
 | POST | /api/v1/auth/login | Autenticar |
-| POST | /api/v1/auth/refresh | Renovar tokens |
+| POST | /api/v1/auth/organizations | Listar organizações do usuário após validar credenciais |
+| POST | /api/v1/auth/refresh | Rotacionar tokens |
 | POST | /api/v1/auth/logout | Revogar sessão |
 | GET | /api/v1/auth/me | Perfil autenticado |
-| GET | /api/v1/organizations/current | Organização ativa |
-| GET | /api/v1/organizations/current/members | Membros da organização |
-| PATCH | /api/v1/organizations/current/members/{userId}/role | Alterar papel |
-| DELETE | /api/v1/organizations/current/members/{userId} | Remover membro |
-| GET | /api/v1/properties | Listar imóveis |
-| POST | /api/v1/properties | Criar imóvel |
-| GET | /api/v1/properties/{propertyId} | Consultar imóvel |
-| PUT | /api/v1/properties/{propertyId} | Atualizar imóvel |
-| DELETE | /api/v1/properties/{propertyId} | Arquivar imóvel |
-| GET | /api/v1/leads | Listar leads |
-| POST | /api/v1/leads | Criar lead |
-| GET | /api/v1/leads/{leadId} | Consultar lead |
+| POST | /api/v1/auth/password/forgot | Solicitar recuperação |
+| POST | /api/v1/auth/password/reset | Redefinir senha |
+| POST | /api/v1/auth/email-verification/confirm | Confirmar e-mail |
+| POST | /api/v1/me/email-verification | Enviar verificação |
+| GET/PATCH | /api/v1/organizations/current/settings | Consultar/alterar configurações |
+| GET | /api/v1/organizations/current/members | Listar membros |
+| PATCH/DELETE | /api/v1/organizations/current/members/{userId}... | Gerir membros |
+| GET/POST | /api/v1/organizations/current/invitations | Listar/criar convites |
+| DELETE | /api/v1/organizations/current/invitations/{id} | Revogar convite |
+| GET/POST | /api/v1/properties | Listar/criar imóveis |
+| GET/PUT/DELETE | /api/v1/properties/{propertyId} | Consultar/editar/arquivar imóvel |
+| GET/POST | /api/v1/properties/{propertyId}/images | Listar/enviar imagens |
+| GET/DELETE | /api/v1/properties/{propertyId}/images/{imageId}... | Conteúdo/remover imagem |
+| GET/POST | /api/v1/leads | Listar/criar leads |
 | PATCH | /api/v1/leads/{leadId}/status | Atualizar status |
-| PATCH | /api/v1/leads/{leadId}/assignment | Atribuir membro |
+| PATCH | /api/v1/leads/{leadId}/assignment | Atribuir responsável |
 | GET/POST | /api/v1/crm/tasks | Listar/criar tarefas |
 | PATCH | /api/v1/crm/tasks/{id}/status | Atualizar tarefa |
 | GET/POST | /api/v1/crm/visits | Listar/agendar visitas |
 | PATCH | /api/v1/crm/visits/{id}/status | Atualizar visita |
 | GET/POST | /api/v1/listings | Listar/criar anúncios |
-| PATCH | /api/v1/listings/{id}/status | Publicar, pausar ou arquivar anúncio |
-| GET | /api/v1/notifications | Caixa de notificações |
-| PATCH | /api/v1/notifications/{id}/read | Marcar notificação como lida |
-| PATCH | /api/v1/notifications/read-all | Marcar todas como lidas |
+| PATCH | /api/v1/listings/{id}/status | Publicar/pausar/arquivar |
+| GET | /api/v1/public/{organizationSlug}/listings | Portal público |
+| GET | /api/v1/public/{organizationSlug}/listings/{slug} | Detalhe público |
+| POST | /api/v1/public/{organizationSlug}/leads | Capturar lead público |
+| GET/POST | /api/v1/conversations | Listar/criar conversas |
+| GET/POST | /api/v1/conversations/{id}/messages | Ler/enviar mensagens |
+| GET/PATCH | /api/v1/notifications | Consultar/atualizar notificações |
+| GET/POST | /api/v1/automations | Gerir regras de automação |
+| GET | /api/v1/dashboard/summary | Indicadores do dashboard |
+| GET | /api/v1/analytics/properties/{propertyId} | Visualizações do imóvel |
+| GET/PATCH | /api/v1/me/profile | Perfil do usuário |
+| GET | /api/v1/me/export | Exportação de dados |
+| POST | /api/v1/me/privacy-requests | Solicitar ação de privacidade |
+
+A lista completa e os schemas também ficam disponíveis em `/swagger-ui.html`.
 
 ## Multi-tenancy e segurança
-A associação usuário-empresa é explícita. O tenant ativo é resolvido a partir da sessão persistida e membership validada, nunca de um organization_id arbitrário enviado pelo cliente. Operações de domínio usam o organizationId do principal autenticado em cada consulta e alteração.
+- O tenant vem do principal autenticado, nunca de um `organizationId` enviado pelo cliente.
+- Consultas e alterações de domínio filtram por organização.
+- FKs compostas impedem associações entre organizações diferentes.
+- Papéis são verificados no servidor com method security.
+- Tokens não são armazenados em texto puro.
+- CORS usa allowlist explícita (`CORS_ALLOWED_ORIGINS`); vazio mantém o uso same-origin.
+- Uploads ficam fora da pasta pública e validam assinatura básica do arquivo e tamanho.
+- Hibernate usa `ddl-auto: validate`; Flyway é a única fonte de evolução do schema.
 
-Hibernate permanece em `validate`; Flyway controla o schema. Tokens não são armazenados em texto puro. A autorização por papéis complementa, mas não substitui, a filtragem tenant-scoped.
+## Variáveis importantes
+- `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`
+- `IMOBPRO_STORAGE_ROOT`
+- `APP_PUBLIC_BASE_URL`
+- `SPRING_MAIL_HOST`, `SPRING_MAIL_PORT`, `SPRING_MAIL_USERNAME`, `SPRING_MAIL_PASSWORD`
+- `CORS_ALLOWED_ORIGINS`
+- `SERVER_PORT`
 
-## Testes e CI
-A suíte inclui teste unitário de health e teste de integração com PostgreSQL 17 via Testcontainers cobrindo registro, perfil, logout e tentativa de leitura cross-tenant. O GitHub Actions executa build/testes e ktlint. Consulte o status da execução antes de considerar qualquer entrega validada.
+## CI e testes
+GitHub Actions executa build/testes e ktlint. A suíte PostgreSQL usa Testcontainers; quando Docker não está disponível, essa parte pode ser desabilitada pelo próprio teste, o que não equivale a validar o schema em PostgreSQL real. A execução de CI mais recente deve ser conferida no GitHub antes de mesclar.
 
-## Ainda não pronto para produção
-Ainda faltam: adaptador de armazenamento e upload seguro de imagens; mensagens/conversas; automações e regras; favoritos e buscas salvas; páginas/configurações do site; convites, verificação de e-mail e recuperação de senha; rate limiting distribuído, CORS allowlist, hardening de produção, testes de carga, observabilidade, deploy e integração com a interface legada. O log de atividades e o esquema dos módulos não substituem esses fluxos completos.
+## Trabalho ainda necessário antes de produção
+- Integração completa da interface HTML/JS legada com os contratos Kotlin, incluindo adaptação de autenticação e formatos antigos.
+- Migração dos dados SQLite existentes para PostgreSQL com relatório de reconciliação, sem sobrescrever nem apagar a origem.
+- Coleções de imóveis e equivalência de todos os 67 endpoints legados ainda não migrados.
+- Gestão de participantes de conversas, notificações assíncronas de todos os eventos e tratamento operacional de falhas do outbox.
+- Integrações reais com portais imobiliários externos.
+- Storage S3/compatível, antivírus, decodificação/reescrita de imagens, thumbnails e política de retenção.
+- Rate limiting distribuído, proteção antiabuso no portal público e políticas de bloqueio.
+- Testes de integração adicionais para convites, e-mail, upload, automações, analytics e isolamento de todos os módulos.
+- Observabilidade, métricas, logs estruturados, alertas, backup/restore testado, gestão de segredos e deploy monitorado.
+- Revisão de segurança independente, LGPD, retenção e políticas do cliente.
 
-## Segurança
-Não publicar em produção antes de revisar configuração de segredos, CORS, rate limiting, política de criação de contas, recuperação de senha, logs sem dados sensíveis, backups, monitoramento e testes completos.
+**Não considere o sistema pronto para produção** até fechar a lista acima, validar a integração ponta a ponta e fazer uma migração ensaiada com backup e plano de rollback.
