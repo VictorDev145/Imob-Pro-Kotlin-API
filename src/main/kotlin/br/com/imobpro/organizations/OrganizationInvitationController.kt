@@ -32,7 +32,7 @@ import java.util.UUID
 
 data class CreateInvitationRequest(
     @field:Email @field:NotBlank @field:Size(max = 254) val email: String,
-    @field:Pattern(regexp = "ADMIN|MANAGER|AGENT|CUSTOMER") val role: String,
+    @field:Pattern(regexp = "ADMIN|MANAGER|AGENT|CUSTOMER|PROPERTY_OWNER") val role: String,
 )
 
 data class InvitationResponse(
