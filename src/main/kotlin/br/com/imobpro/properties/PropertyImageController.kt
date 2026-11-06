@@ -206,8 +206,9 @@ class PropertyImageController(private val service: PropertyImageService) {
     fun upload(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
-        @RequestParam("files") files: List<MultipartFile>,
-    ): List<PropertyImageResponse> = service.upload(authentication.tenant(), propertyId, files)
+        @RequestParam(name = "files", required = false) files: List<MultipartFile>?,
+        @RequestParam(name = "images[]", required = false) legacyImages: List<MultipartFile>?,
+    ): List<PropertyImageResponse> = service.upload(authentication.tenant(), propertyId, files.orEmpty() + legacyImages.orEmpty())
 
     @GetMapping("/{imageId}/content")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
