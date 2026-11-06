@@ -4,6 +4,7 @@ const definitions = [
   ["GET", /^\/api\/health$/, "/api/v1/health"],
   ["GET", /^\/api\/admin\/stats$/, "/api/v1/dashboard/summary"],
   ["GET", /^\/api\/admin\/activity$/, "/api/v1/dashboard/activity"],
+  ["GET", /^\/api\/admin\/property-analytics\/([^/]+)$/, "/api/v1/analytics/properties/$1"],
   ["GET", /^\/api\/admin\/tasks$/, "/api/v1/crm/tasks"],
   ["POST", /^\/api\/admin\/tasks$/, "/api/v1/crm/tasks"],
   ["PATCH", /^\/api\/admin\/tasks\/([^/]+)$/, "/api/v1/crm/tasks/$1/status"],
