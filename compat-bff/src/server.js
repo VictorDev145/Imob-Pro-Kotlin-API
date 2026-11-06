@@ -151,11 +151,6 @@ app.get("/accept-invitation", (_req, res) => {
   return res.type("html").send(invitationPage);
 });
 
-app.get("/reset-password", (_req, res) => {
-  res.set("Cache-Control", "no-store");
-  return res.type("html").send(resetPasswordPage);
-});
-
 const resetPasswordPage = `<!doctype html>
 <html lang="pt-BR">
 <head>
@@ -208,6 +203,54 @@ form.addEventListener("submit",async event=>{
 </script>
 </body></html>`;
 
+const verifyEmailPage = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirmar e-mail · Imob-Pro</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#101820;color:#f5f3ed;font:16px system-ui,sans-serif}
+main{width:min(100%,460px);padding:32px;border:1px solid #39444c;border-radius:18px;background:#18232c;box-shadow:0 24px 80px #0006}
+h1{margin:0 0 8px;font-size:28px}p{color:#bdc7cc;line-height:1.5}#status{min-height:24px;margin-top:16px;font-size:14px}a{color:#e4c47f}
+</style>
+</head>
+<body><main>
+<div style="color:#d9b56d;font-size:12px;letter-spacing:2px;font-weight:700">IMOB-PRO</div>
+<h1>Confirmar e-mail</h1>
+<p id="status" role="status" aria-live="polite">Validando seu link…</p>
+</main>
+<script>
+const statusNode=document.getElementById("status");
+const token=new URLSearchParams(location.search).get("token");
+(async()=>{
+ if(!token){statusNode.textContent="Link inválido ou incompleto.";return;}
+ try{
+  const csrfResponse=await fetch("/api/csrf",{credentials:"same-origin"});
+  if(!csrfResponse.ok)throw new Error("Não foi possível iniciar a validação. Atualize a página.");
+  const csrf=await csrfResponse.json();
+  const response=await fetch("/api/auth/email-verification/confirm",{
+   method:"POST",credentials:"same-origin",
+   headers:{"content-type":"application/json","x-csrf-token":csrf.csrfToken},
+   body:JSON.stringify({token})
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(result.error?.message||result.message||"Não foi possível confirmar o e-mail.");
+  statusNode.innerHTML="E-mail confirmado! <a href="/">Voltar ao Imob-Pro</a>";
+ }catch(error){statusNode.textContent=error.message;}
+})();
+</script>
+</body></html>`;
+
+app.get("/reset-password", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  return res.type("html").send(resetPasswordPage);
+});
+
+app.get("/verify-email", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  return res.type("html").send(verifyEmailPage);
+});
 
 app.get("/api/csrf", (req, res) => {
   const token = csrfToken();
@@ -466,6 +509,16 @@ app.post("/api/auth/invitations/accept", authLimiter, requireCsrf, async (req, r
     });
     return sendApiResult(res, result);
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível aceitar o convite."); }
+});
+
+app.post("/api/auth/email-verification/confirm", authLimiter, requireCsrf, async (req, res) => {
+  try {
+    const result = await apiCall("/api/v1/auth/email-verification/confirm", {
+      method: "POST",
+      body: toCamel(req.body || {}),
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível confirmar o e-mail."); }
 });
 
 app.post("/api/auth/forgot-password", authLimiter, requireCsrf, async (req, res) => {
