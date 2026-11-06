@@ -35,4 +35,4 @@ fi
 
 pg_restore --list "${work_file}" >/dev/null
 pg_restore --dbname="${RESTORE_DATABASE_URL}" --no-owner --no-acl --exit-on-error "${work_file}"
-echo '{"status":"restore_completed","target_label":"'"\${RESTORE_TARGET_LABEL}"'"}'
+echo '{"status":"restore_completed","target_label":"'"${RESTORE_TARGET_LABEL}"'"}'
