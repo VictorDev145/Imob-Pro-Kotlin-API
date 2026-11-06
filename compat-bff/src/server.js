@@ -25,10 +25,12 @@ const pool = new pg.Pool({
 const redisClient = createClient({ url: process.env.REDIS_URL });
 redisClient.on("error", () => process.stderr.write("Redis connection error\\n"));
 await redisClient.connect();
-const sharedLimiterStore = new RedisStore({
+const createLimiterStore = prefix => new RedisStore({
   sendCommand: (...args) => redisClient.sendCommand(args),
-  prefix: "imobpro:ratelimit:",
+  prefix: "imobpro:ratelimit:" + prefix,
 });
+const authLimiterStore = createLimiterStore("auth:");
+const apiLimiterStore = createLimiterStore("api:");
 const PgStore = connectPgSimple(session);
 const app = express();
 app.disable("x-powered-by");
@@ -52,8 +54,8 @@ app.use(session({
   },
 }));
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-7", legacyHeaders: false, store: sharedLimiterStore });
-const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 1200, standardHeaders: "draft-7", legacyHeaders: false, store: sharedLimiterStore });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-7", legacyHeaders: false, store: authLimiterStore });
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 1200, standardHeaders: "draft-7", legacyHeaders: false, store: apiLimiterStore });
 const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function legacyUser(user) {
