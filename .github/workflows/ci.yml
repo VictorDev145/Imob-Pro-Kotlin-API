@@ -23,3 +23,5 @@ jobs:
         run: gradle --no-daemon clean test bootJar
       - name: Check Kotlin formatting
         run: gradle --no-daemon ktlintCheck
+      - name: Build Docker image
+        run: docker build -t imob-pro-kotlin-api:ci .
