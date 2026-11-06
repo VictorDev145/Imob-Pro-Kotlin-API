@@ -2,7 +2,7 @@
 
 Backend multiempresa do Imob-Pro, construído em Kotlin + Spring Boot, com PostgreSQL, autenticação por tokens e isolamento de dados por organização.
 
-> **Estado:** backend em evolução, com os principais domínios operacionais e endpoints públicos iniciais. Ainda não é uma migração concluída nem um deploy de produção. A interface HTML/JS legada permanece preservada no repositório original e a integração completa com ela ainda está pendente.
+> **Estado:** backend e BFF em evolução. Uma cópia versionada da interface HTML/CSS/JS foi adicionada em `web/` neste repositório, preservando o repositório legado original. O Compose agora sobe a interface, o BFF e a API Kotlin na mesma origem. A equivalência funcional dos 67 contratos e os testes ponta a ponta ainda estão pendentes; não é um deploy de produção.
 
 ## Stack
 - Kotlin 2.2.21 / Java 21 / Spring Boot 3.5.7
@@ -24,7 +24,7 @@ Backend multiempresa do Imob-Pro, construído em Kotlin + Spring Boot, com Postg
 ### Stack completa em Docker
 `docker compose up --build -d`
 
-O Compose sobe PostgreSQL e API, com volume persistente para o banco e os arquivos enviados. Credenciais padrão do Compose são apenas para desenvolvimento; altere todos os segredos antes de qualquer ambiente compartilhado.
+O Compose sobe PostgreSQL, Redis, API Kotlin, BFF e a cópia da interface web, com volume persistente para o banco e os arquivos enviados. A interface é servida pelo Nginx interno e o BFF a publica na mesma origem para manter sessão e CSRF. Credenciais padrão do Compose são apenas para desenvolvimento; altere todos os segredos antes de qualquer ambiente compartilhado.
 
 ## Funcionalidades implementadas
 
@@ -135,7 +135,7 @@ A lista completa e os schemas também ficam disponíveis em `/swagger-ui.html`.
 GitHub Actions executa build/testes e ktlint. A suíte PostgreSQL usa Testcontainers; quando Docker não está disponível, essa parte pode ser desabilitada pelo próprio teste, o que não equivale a validar o schema em PostgreSQL real. A execução de CI mais recente deve ser conferida no GitHub antes de mesclar.
 
 ## Trabalho ainda necessário antes de produção
-- Integração completa da interface HTML/JS legada com os contratos Kotlin, incluindo adaptação de autenticação e formatos antigos.
+- Equivalência funcional completa da interface HTML/JS com os 67 contratos Kotlin, incluindo todos os formatos antigos, IDs, permissões e respostas.
 - Migração dos dados SQLite existentes para PostgreSQL com relatório de reconciliação, sem sobrescrever nem apagar a origem.
 - Equivalência de todos os 67 endpoints legados ainda não migrados.
 - Gestão de participantes de conversas, notificações assíncronas de todos os eventos e tratamento operacional de falhas do outbox.
