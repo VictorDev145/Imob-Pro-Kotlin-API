@@ -46,6 +46,11 @@ app.use(session({
 const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-7", legacyHeaders: false });
 const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+function legacyUser(user) {
+  if (!user) return null;
+  return { id: user.userId || user.id, name: user.fullName || user.name, email: user.email, phone: user.phone || null, role: String(user.role || "").toLowerCase() };
+}
+
 function fail(res, status, code, message) {
   return res.status(status).json({ error: { code, message } });
 }
@@ -255,7 +260,9 @@ app.post("/api/auth/login", authLimiter, requireCsrf, async (req, res) => {
     req.session.refreshToken = result.data.refreshToken;
     req.session.accessExpiresAt = result.data.expiresAt;
     const me = await authenticatedCall(req, "/api/v1/auth/me");
-    return res.status(200).json(toSnake(me.data));
+    if (me.status !== 200) return sendApiResult(res, me);
+    req.session.organizationId = me.data.organizationId;
+    return res.status(200).json(legacyUser(me.data));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível concluir o login."); }
 });
 
@@ -279,7 +286,9 @@ app.post("/api/auth/register", authLimiter, requireCsrf, async (req, res) => {
     req.session.refreshToken = result.data.refreshToken;
     req.session.accessExpiresAt = result.data.expiresAt;
     const me = await authenticatedCall(req, "/api/v1/auth/me");
-    return res.status(201).json(toSnake(me.data));
+    if (me.status !== 200) return sendApiResult(res, me);
+    req.session.organizationId = me.data.organizationId;
+    return res.status(201).json(legacyUser(me.data));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível concluir o cadastro."); }
 });
 
@@ -312,7 +321,8 @@ app.get("/api/auth/me", async (req, res) => {
   try {
     const result = await authenticatedCall(req, "/api/v1/auth/me");
     if (result.status === 401) return res.json(null);
-    return sendApiResult(res, result);
+    if (result.status === 401) return res.json(null);
+    return res.status(200).json(legacyUser(result.data));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
 });
 
@@ -705,6 +715,90 @@ app.get("/media/property/:propertyId/:imageId", async (req, res) => {
     if (result.status !== 200) return sendApiResult(res, result);
     return res.send(result.data);
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Imagem indisponível."); }
+});
+
+
+app.get("/api/admin/users", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/organizations/current/members");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data || []).map(member => ({
+      id: member.userId, name: member.fullName, email: member.email,
+      role: String(member.role || "").toLowerCase(), status: String(member.status || "").toLowerCase(),
+      joined_at: member.joinedAt,
+    })));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Equipe indisponível."); }
+});
+
+app.get("/api/me/favorites", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/me/favorites");
+    if (result.status !== 200) return sendApiResult(res, result);
+    const items = await Promise.all((result.data || []).map(async favorite => {
+      const property = await authenticatedCall(req, "/api/v1/properties/" + encodeURIComponent(favorite.propertyId));
+      if (property.status !== 200) return null;
+      const images = await authenticatedCall(req, "/api/v1/properties/" + encodeURIComponent(favorite.propertyId) + "/images");
+      const listing = await authenticatedCall(req, "/api/v1/listings?limit=100");
+      const status = (listing.data || []).find(item => item.propertyId === favorite.propertyId)?.status;
+      return legacyPropertyFromPrivate(property.data, images.status === 200 ? images.data || [] : [], status);
+    }));
+    return res.json(items.filter(Boolean));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Favoritos indisponíveis."); }
+});
+
+app.get("/api/me/notifications", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/notifications?limit=50");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data?.items || []).map(item => ({
+      id: item.id, title: item.title, message: item.body || "",
+      read_at: item.readAt, created_at: item.createdAt,
+    })));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Notificações indisponíveis."); }
+});
+
+app.get("/api/me/collections", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/me/collections");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data || []).map(collection => ({
+      id: collection.id, name: collection.name, description: collection.description,
+      created_at: collection.createdAt, updated_at: collection.updatedAt,
+      items: (collection.items || []).map(item => ({
+        id: item.propertyId, property_id: item.propertyId, title: item.title,
+        city: item.city, state: item.state, price: Number(item.rentPrice || item.salePrice || 0),
+        purpose: item.rentPrice ? "aluguel" : "venda", neighborhood: "",
+        bedrooms: 0, suites: 0, bathrooms: 0, parking: 0, area: 0,
+        cover_image: "", images: [], description: item.comment || "",
+      })),
+    })));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Coleções indisponíveis."); }
+});
+
+app.get("/api/me/saved-searches", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/me/saved-searches");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data || []).map(item => ({
+      id: item.id, name: item.name, filters: item.criteria,
+      frequency: item.alertsEnabled ? "daily" : "manual", created_at: item.createdAt,
+    })));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Buscas salvas indisponíveis."); }
+});
+
+app.post("/api/me/saved-searches", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const result = await authenticatedCall(req, "/api/v1/me/saved-searches", {
+      method: "POST",
+      body: {
+        name: body.name || "Minha busca",
+        criteria: body.filters || body.criteria || {},
+        alertsEnabled: String(body.frequency || "").toLowerCase() !== "manual",
+      },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível salvar a busca."); }
 });
 
 app.use("/api", async (req, res, next) => {
