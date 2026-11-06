@@ -1,6 +1,5 @@
 package br.com.imobpro.auth
 
-import br.com.imobpro.automations.CreateAutomationRequest
 import br.com.imobpro.leads.CreateLeadRequest
 import br.com.imobpro.leads.LeadResponse
 import br.com.imobpro.leads.UpdateLeadStatusRequest
