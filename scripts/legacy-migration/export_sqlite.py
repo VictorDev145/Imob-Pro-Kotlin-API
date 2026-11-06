@@ -95,7 +95,9 @@ def main() -> int:
     for table in EXPECTED_TABLES:
         destination = output / f"{table}.jsonl"
         count = 0
-        columns = [row["name"] for row in connection.execute(f'PRAGMA table_info("{table}")')]
+        table_info = list(connection.execute(f'PRAGMA table_info("{table}")'))
+        columns = [row["name"] for row in table_info]
+        primary_key = [row["name"] for row in sorted((row for row in table_info if row["pk"]), key=lambda row: row["pk"]) ]
         with destination.open("w", encoding="utf-8", newline="\n") as stream:
             for row in connection.execute(f'SELECT * FROM "{table}"'):
                 record = {key: encode(row[key]) for key in columns}
@@ -108,6 +110,7 @@ def main() -> int:
         table_manifest[table] = {
             "rows": count,
             "columns": columns,
+            "primary_key": primary_key,
             "file": destination.name,
             "sha256": sha256(destination),
         }
