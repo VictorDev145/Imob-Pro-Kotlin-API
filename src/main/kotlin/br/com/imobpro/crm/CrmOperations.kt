@@ -1,6 +1,7 @@
 package br.com.imobpro.crm
 
 import br.com.imobpro.auth.TenantPrincipal
+import br.com.imobpro.automations.AutomationEventWriter
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Max
 import jakarta.validation.constraints.Min
@@ -86,7 +87,10 @@ data class VisitResponse(
 data class CrmPage<T>(val items: List<T>, val offset: Int, val limit: Int)
 
 @Service
-class CrmOperationsService(private val jdbc: NamedParameterJdbcTemplate) {
+class CrmOperationsService(
+    private val jdbc: NamedParameterJdbcTemplate,
+    private val automationEvents: AutomationEventWriter,
+) {
     @Transactional
     fun createTask(principal: TenantPrincipal, request: CreateTaskRequest): TaskResponse {
         requireActiveAssignee(principal, request.assignedToUserId)
@@ -184,6 +188,11 @@ class CrmOperationsService(private val jdbc: NamedParameterJdbcTemplate) {
                 .addValue("creator", principal.userId),
         )
         record(principal, "VISIT_SCHEDULED", "VISIT", id)
+        automationEvents.enqueue(
+            principal, "VISIT_SCHEDULED", "VISIT", id,
+            mapOf("leadId" to request.leadId, "propertyId" to request.propertyId,
+                "assignedToUserId" to request.assignedToUserId),
+        )
         return getVisit(principal, id)
     }
 
