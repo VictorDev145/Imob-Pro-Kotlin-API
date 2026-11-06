@@ -109,10 +109,10 @@ class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
             JOIN conversation_members cm
               ON cm.conversation_id = c.id AND cm.organization_id = c.organization_id
             WHERE c.organization_id = :org AND cm.user_id = :user
-              AND (:withUserId IS NULL OR EXISTS (
+              AND (CAST(:withUserId AS UUID) IS NULL OR EXISTS (
                   SELECT 1 FROM conversation_members other
                   WHERE other.organization_id = c.organization_id
-                    AND other.conversation_id = c.id AND other.user_id = :withUserId
+                    AND other.conversation_id = c.id AND other.user_id = CAST(:withUserId AS UUID)
               ))
             ORDER BY c.updated_at DESC
             """.trimIndent(),
