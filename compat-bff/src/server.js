@@ -647,7 +647,7 @@ app.post("/api/properties/:id/view", requireCsrf, async (req, res) => {
 app.post("/api/visits", requireCsrf, async (req, res) => {
   try {
     const body = req.body || {};
-    const result = await authenticatedCall(req, "/api/v1/crm/visits", {
+    const result = await authenticatedCall(req, "/api/v1/me/visit-requests", {
       method: "POST",
       body: {
         propertyId: body.property_id || body.propertyId,
@@ -658,6 +658,25 @@ app.post("/api/visits", requireCsrf, async (req, res) => {
     if (result.status !== 201) return sendApiResult(res, result);
     return res.status(201).json(legacyVisit(result.data));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível solicitar a visita."); }
+});
+
+app.post("/api/admin/visits", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const result = await authenticatedCall(req, "/api/v1/crm/visits", {
+      method: "POST",
+      body: {
+        propertyId: body.property_id || body.propertyId,
+        leadId: body.lead_id || body.leadId || null,
+        assignedToUserId: body.agent_id || body.user_id || body.assigned_to || null,
+        scheduledAt: body.visit_date || body.scheduled_at || body.scheduledAt,
+        durationMinutes: Number(body.duration_minutes || 60),
+        notes: body.notes || null,
+      },
+    });
+    if (result.status !== 201) return sendApiResult(res, result);
+    return res.status(201).json(legacyVisit(result.data));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível agendar a visita."); }
 });
 
 app.post("/api/admin/tasks", requireCsrf, async (req, res) => {
