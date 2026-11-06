@@ -49,7 +49,8 @@ O Compose sobe PostgreSQL e API, com volume persistente para o banco e os arquiv
 - Tarefas e visitas com responsável, prazo/agendamento, prioridade e status.
 - Caixa de notificações por usuário, leitura individual e em lote.
 - Conversas e mensagens limitadas aos participantes cadastrados.
-- Favoritos e buscas salvas por usuário/organização.
+- Favoritos, buscas salvas e coleções de imóveis por usuário/organização.
+- Alteração de senha autenticada, recuperação e verificação de e-mail.
 - Perfil, exportação de dados e solicitações de privacidade.
 - Páginas e configurações básicas do site por organização.
 
@@ -71,6 +72,7 @@ O Compose sobe PostgreSQL e API, com volume persistente para o banco e os arquiv
 | GET | /api/v1/auth/me | Perfil autenticado |
 | POST | /api/v1/auth/password/forgot | Solicitar recuperação |
 | POST | /api/v1/auth/password/reset | Redefinir senha |
+| POST | /api/v1/me/password | Alterar senha autenticado |
 | POST | /api/v1/auth/email-verification/confirm | Confirmar e-mail |
 | POST | /api/v1/me/email-verification | Enviar verificação |
 | GET/PATCH | /api/v1/organizations/current/settings | Consultar/alterar configurações |
@@ -100,6 +102,9 @@ O Compose sobe PostgreSQL e API, com volume persistente para o banco e os arquiv
 | GET/POST | /api/v1/automations | Gerir regras de automação |
 | GET | /api/v1/dashboard/summary | Indicadores do dashboard |
 | GET | /api/v1/analytics/properties/{propertyId} | Visualizações do imóvel |
+| GET/POST | /api/v1/me/collections | Listar/criar coleções |
+| POST | /api/v1/me/collections/{collectionId}/items | Adicionar imóvel à coleção |
+| DELETE | /api/v1/me/collections/{collectionId}/items/{propertyId} | Remover imóvel da coleção |
 | GET/PATCH | /api/v1/me/profile | Perfil do usuário |
 | GET | /api/v1/me/export | Exportação de dados |
 | POST | /api/v1/me/privacy-requests | Solicitar ação de privacidade |
@@ -130,7 +135,7 @@ GitHub Actions executa build/testes e ktlint. A suíte PostgreSQL usa Testcontai
 ## Trabalho ainda necessário antes de produção
 - Integração completa da interface HTML/JS legada com os contratos Kotlin, incluindo adaptação de autenticação e formatos antigos.
 - Migração dos dados SQLite existentes para PostgreSQL com relatório de reconciliação, sem sobrescrever nem apagar a origem.
-- Coleções de imóveis e equivalência de todos os 67 endpoints legados ainda não migrados.
+- Equivalência de todos os 67 endpoints legados ainda não migrados.
 - Gestão de participantes de conversas, notificações assíncronas de todos os eventos e tratamento operacional de falhas do outbox.
 - Integrações reais com portais imobiliários externos.
 - Storage S3/compatível, antivírus, decodificação/reescrita de imagens, thumbnails e política de retenção.
