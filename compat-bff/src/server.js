@@ -544,6 +544,25 @@ app.get("/api/admin/stats", async (req, res) => {
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Dashboard indisponível."); }
 });
 
+app.get("/api/admin/property-analytics/:id", async (req, res) => {
+  try {
+    const result = await authenticatedCall(
+      req,
+      "/api/v1/analytics/properties/" + encodeURIComponent(req.params.id),
+    );
+    if (result.status !== 200) return sendApiResult(res, result);
+    const value = result.data;
+    return res.json({
+      property: value.property,
+      total: value.total,
+      unique: value.unique,
+      favorites: value.favorites,
+      leads: value.leads,
+      visits: value.visits,
+    });
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Métricas do imóvel indisponíveis."); }
+});
+
 app.get("/api/agent/summary", async (req, res) => {
   try {
     const [leads, tasks, unread] = await Promise.all([
