@@ -65,7 +65,7 @@ Não descarte linhas órfãs silenciosamente. Gere um CSV/JSON de quarentena com
 8. Manter o SQLite original, export e cópias de uploads imutáveis durante a janela de rollback definida pela operação.
 
 ## Bloqueio conhecido
-O importador PostgreSQL ainda não foi ativado. É intencional não inventar conversões para campos e permissões que precisam de validação de negócio. A exportação auditável é a primeira etapa segura; o carregamento depende de mapear as migrations de destino, validar os campos legados completos e definir a política de papéis da organização de migração.
+O importador PostgreSQL para staging já está implementado em `scripts/legacy-migration/import_to_postgres.py`: valida manifesto, hashes e contagens, e carrega os JSONL em `legacy_import_rows` sem tocar nas tabelas de domínio. O que ainda não existe é a conversão dessas linhas para `users`, `properties`, `leads` e demais tabelas operacionais. É intencional não inventar conversões para campos e permissões que precisam de validação de negócio. A próxima etapa exige mapear as migrations de destino, validar os campos legados completos, reconciliar papéis e ownership e definir a política da organização de migração.
 
 
 ### Windows PowerShell
