@@ -40,6 +40,14 @@ class AutomationEventWorker(
     fun dispatch() {
         if (!enabled) return
         val events = transactions.execute {
+            jdbc.update(
+                """
+                UPDATE automation_events
+                SET status = 'FAILED', last_error = 'Worker lease expired'
+                WHERE status = 'PROCESSING' AND available_at < NOW() - INTERVAL '5 minutes'
+                """.trimIndent(),
+                MapSqlParameterSource(),
+            )
             val pending = jdbc.query(
                 """
                 SELECT * FROM automation_events
@@ -55,7 +63,7 @@ class AutomationEventWorker(
                 jdbc.update(
                     """
                     UPDATE automation_events
-                    SET status = 'PROCESSING', attempts = attempts + 1
+                    SET status = 'PROCESSING', attempts = attempts + 1, available_at = NOW()
                     WHERE id = :id
                     """.trimIndent(),
                     MapSqlParameterSource().addValue("id", event.id),
