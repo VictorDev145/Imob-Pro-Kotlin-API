@@ -91,6 +91,10 @@ def main() -> int:
     if missing:
         raise RuntimeError("Legacy schema differs from audited schema; missing tables: " + ", ".join(missing))
 
+    unexpected = sorted(available - set(EXPECTED_TABLES) - set(EXCLUDED_TABLES))
+    if unexpected:
+        raise RuntimeError("Unexpected application tables require audit before export: " + ", ".join(unexpected))
+
     table_manifest: dict[str, Any] = {}
     for table in EXPECTED_TABLES:
         destination = output / f"{table}.jsonl"
@@ -120,6 +124,8 @@ def main() -> int:
         source_uploads = args.uploads.resolve()
         if not source_uploads.is_dir():
             raise RuntimeError(f"uploads directory not found: {source_uploads}")
+        if any(path.is_symlink() for path in source_uploads.rglob("*")):
+            raise RuntimeError("uploads contains symlinks; export them separately after manual review")
         target_uploads = output / "uploads"
         shutil.copytree(source_uploads, target_uploads, symlinks=False)
         file_entries = []
