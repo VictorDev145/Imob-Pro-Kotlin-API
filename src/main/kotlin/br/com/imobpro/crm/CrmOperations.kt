@@ -89,6 +89,7 @@ data class CrmPage<T>(val items: List<T>, val offset: Int, val limit: Int)
 class CrmOperationsService(private val jdbc: NamedParameterJdbcTemplate) {
     @Transactional
     fun createTask(principal: TenantPrincipal, request: CreateTaskRequest): TaskResponse {
+        requireActiveAssignee(principal, request.assignedToUserId)
         val id = UUID.randomUUID()
         jdbc.update(
             """
@@ -156,6 +157,7 @@ class CrmOperationsService(private val jdbc: NamedParameterJdbcTemplate) {
 
     @Transactional
     fun createVisit(principal: TenantPrincipal, request: CreateVisitRequest): VisitResponse {
+        requireActiveAssignee(principal, request.assignedToUserId)
         if (!request.scheduledAt.isAfter(Instant.now().minusSeconds(60))) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Visit must be scheduled in the future")
         }
@@ -217,6 +219,21 @@ class CrmOperationsService(private val jdbc: NamedParameterJdbcTemplate) {
         )
         if (changed == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND)
         record(principal, "VISIT_STATUS_CHANGED", "VISIT", id)
+    }
+
+    private fun requireActiveAssignee(principal: TenantPrincipal, assigneeId: UUID?) {
+        if (assigneeId == null) return
+        val active = jdbc.query(
+            """
+            SELECT 1 FROM organization_memberships
+            WHERE organization_id = :org AND user_id = :user AND status = 'ACTIVE'
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", principal.organizationId)
+                .addValue("user", assigneeId),
+        ) { rs, _ -> rs.getInt(1) }.isNotEmpty()
+        if (!active) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Assignee is not an active organization member")
+        }
     }
 
     private fun record(principal: TenantPrincipal, action: String, type: String, id: UUID) {
