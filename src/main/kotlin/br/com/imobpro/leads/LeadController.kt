@@ -26,6 +26,7 @@ import java.util.UUID
 @RequestMapping("/api/v1/leads")
 class LeadController(private val leadService: LeadService) {
     @GetMapping
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
     fun list(
         authentication: Authentication,
         @RequestParam(defaultValue = "0") @Min(0) offset: Int,
@@ -36,6 +37,7 @@ class LeadController(private val leadService: LeadService) {
     ): LeadPage = leadService.list(authentication.tenantPrincipal(), offset, limit, status)
 
     @GetMapping("/{leadId}")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
     fun get(authentication: Authentication, @PathVariable leadId: UUID): LeadResponse =
         leadService.get(authentication.tenantPrincipal(), leadId)
 
