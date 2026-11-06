@@ -18,6 +18,10 @@ class AuthController(private val authService: AuthService) {
     fun register(@Valid @RequestBody request: RegisterRequest): TokenResponse = authService.register(request)
     @PostMapping("/login")
     fun login(@Valid @RequestBody request: LoginRequest): TokenResponse = authService.login(request)
+
+    @PostMapping("/organizations")
+    fun organizations(@Valid @RequestBody request: LoginRequest): List<OrganizationChoice> =
+        authService.organizations(request)
     @PostMapping("/refresh")
     fun refresh(@Valid @RequestBody request: RefreshRequest): TokenResponse = authService.refresh(request.refreshToken)
     @PostMapping("/logout")
