@@ -38,7 +38,9 @@ jobs:
       - name: Test compatibility BFF
         working-directory: compat-bff
         run: npm install --no-audit --no-fund && node --check src/server.js && node --check src/legacy-routes.js && npm test
-      - name: Validate integrated web frontend\n        run: node --check web/app.js && node --test web/*.test.js\n      - name: Build Docker image
+      - name: Validate integrated web frontend
+        run: node --check web/app.js && node --test web/test/*.test.cjs
+      - name: Build Docker image
         run: docker build -t imob-pro-kotlin-api:ci .
       - name: Build compatibility BFF image
         run: docker build -t imob-pro-compat-bff:ci ./compat-bff
