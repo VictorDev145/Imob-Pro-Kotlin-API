@@ -533,10 +533,13 @@ app.get("/api/admin/stats", async (req, res) => {
     const value = result.data;
     return res.json({
       properties: value.properties,
+      published: value.publishedListings,
+      leads: value.leads,
       newLeads: value.newLeads,
       visits: value.upcomingVisits,
-      customers: value.activeMembers,
-      published: value.publishedListings,
+      owners: value.owners,
+      customers: value.customers,
+      agents: value.agents,
     });
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Dashboard indisponível."); }
 });
