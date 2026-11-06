@@ -31,7 +31,7 @@ if (-not (Test-Path ".env")) {
     $envContent = [System.IO.File]::ReadAllText((Join-Path $repoRoot ".env.example"))
     $envContent = [regex]::Replace($envContent, "(?m)^BFF_SESSION_SECRET=.*$", "BFF_SESSION_SECRET=$(New-UrlSafeSecret)")
     $envContent = [regex]::Replace($envContent, "(?m)^REDIS_PASSWORD=.*$", "REDIS_PASSWORD=$(New-UrlSafeSecret)")
-    [System.IO.File]::WriteAllText((Join-Path $repoRoot ".env"), $envContent, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText((Join-Path $repoRoot ".env"), $envContent, ([System.Text.UTF8Encoding]::new($false)))
     Write-Host "Arquivo .env criado com segredos locais aleatórios." -ForegroundColor Green
 } else {
     Write-Host "Arquivo .env existente preservado." -ForegroundColor Yellow
