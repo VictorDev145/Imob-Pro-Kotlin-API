@@ -87,7 +87,7 @@ app.use((req, _res, next) => {
 
 app.use("/api", apiLimiter);
 
-const invitationPage = \`<!doctype html>
+const invitationPage = `<!doctype html>
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
@@ -140,11 +140,11 @@ form.addEventListener("submit",async event=>{
   const result=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(result.error?.message||result.message||"Não foi possível aceitar o convite.");
   form.hidden=true;
-  statusNode.innerHTML="Convite aceito! Seu acesso foi ativado. <a href=\\"/\\">Ir para o Imob-Pro</a>";
+  statusNode.innerHTML="Convite aceito! Seu acesso foi ativado. <a href="/">Ir para o Imob-Pro</a>";
  }catch(error){statusNode.textContent=error.message;submit.disabled=false;}
 });
 </script>
-</body></html>\`;
+</body></html>`;
 
 app.get("/accept-invitation", (_req, res) => {
   res.set("Cache-Control", "no-store");
