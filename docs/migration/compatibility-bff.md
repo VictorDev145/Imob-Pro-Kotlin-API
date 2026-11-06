@@ -17,7 +17,7 @@ O serviço `compat-bff` é um gateway same-origin separado da API Kotlin:
 
 1. Suba PostgreSQL e API: `docker compose up -d postgres api`.
 2. Inicie o Express legado na porta 3000 para servir a interface estática.
-3. Configure `PUBLIC_ORGANIZATION_SLUG` com o slug da organização/portal que publica os imóveis.
+3. Configure `PUBLIC_ORGANIZATION_SLUG` com o slug da organização/portal que publica os imóveis e `APP_PUBLIC_BASE_URL` com a origem pública do BFF (porta 3100 localmente), pois os links de convite precisam abrir `/accept-invitation` no BFF.
 4. Configure um `BFF_SESSION_SECRET` aleatório com pelo menos 32 caracteres e `LEGACY_WEB_URL` apontando para o servidor estático antigo.
 5. Suba o BFF: `docker compose up -d compat-bff`.
 6. Acesse o BFF na porta 3100. Em produção, o proxy reverso deve publicar a interface e `/api` no mesmo host, encaminhando tudo ao BFF e deixando o BFF buscar os arquivos estáticos no Express.
