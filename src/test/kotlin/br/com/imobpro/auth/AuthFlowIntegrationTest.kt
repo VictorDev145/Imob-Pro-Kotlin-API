@@ -1,8 +1,16 @@
 package br.com.imobpro.auth
 
+import br.com.imobpro.automations.CreateAutomationRequest
 import br.com.imobpro.leads.CreateLeadRequest
 import br.com.imobpro.leads.LeadResponse
 import br.com.imobpro.leads.UpdateLeadStatusRequest
+import br.com.imobpro.listings.CreateListingRequest
+import br.com.imobpro.listings.ListingResponse
+import br.com.imobpro.listings.ListingStatusRequest
+import br.com.imobpro.publicportal.PublicLeadRequest
+import br.com.imobpro.userdata.AddCollectionItemRequest
+import br.com.imobpro.userdata.CollectionResponse
+import br.com.imobpro.userdata.CreateCollectionRequest
 import br.com.imobpro.properties.PropertyResponse
 import br.com.imobpro.properties.SavePropertyRequest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -125,6 +133,74 @@ class AuthFlowIntegrationTest {
                 Void::class.java,
             )
         assertEquals(HttpStatus.NO_CONTENT, leadStatus.statusCode)
+
+
+        val listingCreated =
+            rest.postForEntity(
+                url("/api/v1/listings"),
+                HttpEntity(
+                    CreateListingRequest(
+                        propertyId = property.id,
+                        title = "Apartamento público de integração",
+                    ),
+                    propertyHeaders,
+                ),
+                ListingResponse::class.java,
+            )
+        assertEquals(HttpStatus.CREATED, listingCreated.statusCode)
+        val listing = listingCreated.body!!
+        val published =
+            rest.exchange(
+                url("/api/v1/listings/${listing.id}/status"),
+                HttpMethod.PATCH,
+                HttpEntity(ListingStatusRequest("PUBLISHED"), propertyHeaders),
+                Void::class.java,
+            )
+        assertEquals(HttpStatus.NO_CONTENT, published.statusCode)
+
+        val organizationChoices =
+            rest.postForEntity(
+                url("/api/v1/auth/organizations"),
+                LoginRequest(email, "StrongPassword123"),
+                Array<OrganizationChoice>::class.java,
+            )
+        assertEquals(HttpStatus.OK, organizationChoices.statusCode)
+        val organizationSlug = organizationChoices.body!!.first().slug
+        val publicListing =
+            rest.getForEntity(
+                url("/api/v1/public/$organizationSlug/listings/${listing.publicSlug}"),
+                String::class.java,
+            )
+        assertEquals(HttpStatus.OK, publicListing.statusCode)
+
+        val publicLead =
+            rest.postForEntity(
+                url("/api/v1/public/$organizationSlug/leads"),
+                PublicLeadRequest(
+                    fullName = "Public Portal Buyer",
+                    phone = "+5585999999999",
+                    email = "public-buyer@example.com",
+                    listingSlug = listing.publicSlug,
+                ),
+                Map::class.java,
+            )
+        assertEquals(HttpStatus.CREATED, publicLead.statusCode)
+
+        val collection =
+            rest.postForEntity(
+                url("/api/v1/me/collections"),
+                HttpEntity(CreateCollectionRequest("Favoritos da integração"), propertyHeaders),
+                CollectionResponse::class.java,
+            )
+        assertEquals(HttpStatus.CREATED, collection.statusCode)
+        val addToCollection =
+            rest.exchange(
+                url("/api/v1/me/collections/${collection.body!!.id}/items"),
+                HttpMethod.POST,
+                HttpEntity(AddCollectionItemRequest(property.id), propertyHeaders),
+                Void::class.java,
+            )
+        assertEquals(HttpStatus.NO_CONTENT, addToCollection.statusCode)
 
         val secondRegistration =
             rest.postForEntity(
