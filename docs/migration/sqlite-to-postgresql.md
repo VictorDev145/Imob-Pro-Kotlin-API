@@ -80,3 +80,19 @@ py -3 .\scripts\legacy-migration\export_sqlite.py `
 ```
 
 Ajuste os caminhos para o local real do arquivo SQLite e da pasta de imagens. Feche o servidor legado antes de fazer a cópia de origem ou use uma cópia consistente com seus arquivos WAL. Não envie o export para o GitHub: ele contém dados pessoais e hashes de senha.
+
+
+## Importação verificável para staging PostgreSQL
+
+Depois de gerar e revisar o export, aplique as migrations da API em um banco PostgreSQL de staging (a V11 cria `legacy_import_batches` e `legacy_import_rows`). Instale a dependência e execute:
+
+```powershell
+py -3 -m pip install -r .\scripts\legacy-migration\requirements.txt
+py -3 .\scripts\legacy-migration\import_to_postgres.py `
+  --export "D:\Backups\imob-pro-export" `
+  --dsn "postgresql://imobpro:SEGREDO@localhost:5432/imobpro"
+```
+
+O importador valida SHA-256 e contagens antes de abrir a transação, importa cada linha como JSONB em staging, usa a chave primária real (incluindo chaves compostas) ou uma chave determinística para tabelas sem PK, compara hashes em reexecuções e grava o lote como `RECONCILED`. A mesma exportação gera o mesmo ID de lote, tornando a operação idempotente.
+
+**Importante:** esse processo preserva e reconcilia os registros originais em staging, mas não converte automaticamente os registros para `users`, `properties`, `leads` e demais tabelas de domínio. A conversão de domínio exige um mapeamento validado de papéis, ownership, relacionamentos e campos específicos. Não a execute em produção até concluir essa etapa, validar as contagens e ensaiar rollback.
