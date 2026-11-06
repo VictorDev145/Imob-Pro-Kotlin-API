@@ -130,6 +130,20 @@ function sendApiResult(res, result) {
 }
 
 
+app.get("/media/:listingSlug/:imageId", async (req, res) => {
+  const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
+  if (!slug) return res.sendStatus(404);
+  try {
+    const url = apiBase + "/api/v1/public/" + encodeURIComponent(slug) + "/listings/" +
+      encodeURIComponent(req.params.listingSlug) + "/images/" + encodeURIComponent(req.params.imageId);
+    const upstream = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    if (!upstream.ok) return res.sendStatus(upstream.status);
+    res.set("content-type", upstream.headers.get("content-type") || "application/octet-stream");
+    res.set("cache-control", "public, max-age=600");
+    return res.send(Buffer.from(await upstream.arrayBuffer()));
+  } catch { return res.sendStatus(502); }
+});
+
 app.get("/api/settings", async (_req, res) => {
   const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
   if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
@@ -137,12 +151,62 @@ app.get("/api/settings", async (_req, res) => {
   catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
 });
 
+function legacyPublicProperty(property) {
+  const purpose = property.purpose === "RENT" ? "aluguel" : "venda";
+  const images = (property.images || []).map(image => ({
+    id: image.id,
+    filename: "/media/" + encodeURIComponent(property.slug) + "/" + encodeURIComponent(image.id),
+    alt_text: image.altText || "",
+    position: image.position,
+  }));
+  return {
+    id: property.propertyId,
+    listing_id: property.id,
+    listing_slug: property.slug,
+    title: property.title,
+    description: property.description || "",
+    type: String(property.propertyType || "OTHER").toLowerCase(),
+    purpose,
+    city: property.city,
+    state: property.state,
+    neighborhood: property.neighborhood || "",
+    bedrooms: property.bedrooms || 0,
+    suites: 0,
+    bathrooms: property.bathrooms || 0,
+    parking: property.parkingSpaces || 0,
+    area: Number(property.builtArea || property.landArea || 0),
+    price: Number(property.rentPrice || property.salePrice || 0),
+    condo: 0,
+    iptu: 0,
+    cover_image: images[0]?.filename || "",
+    images,
+    features: [],
+    status: "published",
+  };
+}
+
+app.get("/api/properties/:id", async (req, res) => {
+  const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
+  if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
+  try {
+    const result = await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/listings/by-property/" + encodeURIComponent(req.params.id));
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json(legacyPublicProperty(result.data));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
+});
+
 app.get("/api/properties", async (req, res) => {
   const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
   if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
   try {
-    const query = new URLSearchParams(req.query);
-    return sendApiResult(res, await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/listings" + (query.size ? "?" + query.toString() : "")));
+    const query = new URLSearchParams();
+    if (req.query.offset) query.set("offset", String(req.query.offset));
+    if (req.query.limit) query.set("limit", String(req.query.limit));
+    if (req.query.city) query.set("city", String(req.query.city));
+    if (req.query.purpose) query.set("purpose", String(req.query.purpose).toLowerCase() === "aluguel" ? "RENT" : "SALE");
+    const result = await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/listings" + (query.size ? "?" + query.toString() : ""));
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data?.items || []).map(legacyPublicProperty));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
 });
 
@@ -151,7 +215,13 @@ app.post("/api/leads", authLimiter, requireCsrf, async (req, res) => {
   if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
   try {
     const result = await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/leads", {
-      method: "POST", body: toCamel(req.body || {}),
+      method: "POST", body: {
+        fullName: req.body?.name || req.body?.fullName,
+        phone: req.body?.whatsapp || req.body?.phone,
+        email: req.body?.email,
+        message: req.body?.message,
+        propertyId: req.body?.property_id || req.body?.propertyId || null,
+      },
     });
     return sendApiResult(res, result);
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
