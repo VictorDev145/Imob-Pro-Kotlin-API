@@ -24,6 +24,6 @@ jobs:
       - name: Check Kotlin formatting
         run: gradle --no-daemon ktlintCheck
       - name: Validate legacy migration exporter
-        run: python3 -m py_compile scripts/legacy-migration/export_sqlite.py && python3 scripts/legacy-migration/export_sqlite.py --help
+        run: python3 -m py_compile scripts/legacy-migration/export_sqlite.py scripts/legacy-migration/test_export_sqlite.py && python3 -m unittest discover -s scripts/legacy-migration -p 'test_*.py' && python3 scripts/legacy-migration/export_sqlite.py --help
       - name: Build Docker image
         run: docker build -t imob-pro-kotlin-api:ci .
