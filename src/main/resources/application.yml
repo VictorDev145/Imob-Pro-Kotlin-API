@@ -42,6 +42,11 @@ management:
     health:
       probes:
         enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        liveness:
+          include: livenessState
 springdoc:
   api-docs:
     path: /v3/api-docs
@@ -54,6 +59,12 @@ imobpro:
   storage:
     local:
       root: ${IMOBPRO_STORAGE_ROOT:./var/imobpro/uploads}
+    s3:
+      enabled: ${IMOBPRO_STORAGE_S3_ENABLED:false}
+      bucket: ${IMOBPRO_STORAGE_S3_BUCKET:}
+      region: ${IMOBPRO_STORAGE_S3_REGION:us-east-1}
+      endpoint: ${IMOBPRO_STORAGE_S3_ENDPOINT:}
+      path-style: ${IMOBPRO_STORAGE_S3_PATH_STYLE:true}
 app:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
