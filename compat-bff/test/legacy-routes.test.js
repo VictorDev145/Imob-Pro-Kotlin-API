@@ -109,3 +109,17 @@ test("invitation links have a first-party acceptance page and CSRF-protected API
   assert.match(server, /const invitationPage = `<!doctype html>/);
   assert.match(server, /new URLSearchParams\(location\.search\)\.get\("token"\)/);
 });
+
+
+test("legacy owner accounts map to scoped PROPERTY_OWNER invitations", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  const propertyService = readFileSync(
+    new URL("../../src/main/kotlin/br/com/imobpro/properties/PropertyService.kt", import.meta.url),
+    "utf8",
+  );
+  assert.match(server, /owner: "PROPERTY_OWNER"/);
+  assert.match(server, /PROPERTY_OWNER" \? "owner"/);
+  assert.match(server, /body: \{ email: body\.email, role \}/);
+  assert.match(propertyService, /if \(principal\.role == "PROPERTY_OWNER"\) filters\.add\("created_by = :createdBy"\)/);
+  assert.match(propertyService, /ownerScope", principal\.role == "PROPERTY_OWNER"/);
+});
