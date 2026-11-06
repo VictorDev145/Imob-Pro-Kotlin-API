@@ -22,7 +22,19 @@ Backend multiempresa do Imob-Pro, construído em Kotlin + Spring Boot, com Postg
 5. Verifique `http://localhost:8080/api/v1/health`, `/actuator/health` e `/swagger-ui.html`.
 
 ### Stack completa em Docker
-`docker compose up --build -d`
+
+**Windows 11 (Docker Desktop):**
+1. Abra o Docker Desktop e aguarde o Engine ficar pronto.
+2. No PowerShell, entre na pasta clonada deste repositório.
+3. Execute:
+   ```powershell
+   .\\scripts\\dev\\start-local.ps1
+   ```
+4. O script cria `.env` a partir de `.env.example` (sem sobrescrever um arquivo existente), gera segredos locais aleatórios, valida o Compose, constrói os containers e aguarda a página e o healthcheck do BFF. Quando estiver pronto, abre `http://localhost:3100` no navegador.
+5. Para encerrar os containers sem apagar os dados: `docker compose down`. Para ver logs: `docker compose logs -f`.
+
+**Outros sistemas:** crie `.env` copiando `.env.example`, substitua os segredos e execute `docker compose up --build -d`. Acesse `http://localhost:3100`.
+
 
 O Compose sobe PostgreSQL, Redis, API Kotlin, BFF e a cópia da interface web, com volume persistente para o banco e os arquivos enviados. A interface é servida pelo Nginx interno e o BFF a publica na mesma origem para manter sessão e CSRF. Credenciais padrão do Compose são apenas para desenvolvimento; altere todos os segredos antes de qualquer ambiente compartilhado.
 
