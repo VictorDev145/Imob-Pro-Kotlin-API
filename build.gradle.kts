@@ -39,4 +39,8 @@ dependencies {
 tasks.withType<KotlinCompile> { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 tasks.withType<Test> { useJUnitPlatform() }
 ktlint { version.set("1.5.0") }
-detekt { buildUponDefaultConfig = true; allRules = false; config.setFrom(files("$rootDir/config/detekt/detekt.yml")) }
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+}
