@@ -60,9 +60,9 @@ class ListingService(private val jdbc: NamedParameterJdbcTemplate) {
         jdbc.update(
             """
             INSERT INTO listings (
-                id, organization_id, property_id, title, description, channel, created_by
+                id, organization_id, property_id, title, description, channel, public_slug, created_by
             )
-            SELECT :id, :org, p.id, :title, :description, :channel, :creator
+            SELECT :id, :org, p.id, :title, :description, :channel, :slug, :creator
             FROM properties p
             WHERE p.id = :property AND p.organization_id = :org AND p.archived_at IS NULL
             """.trimIndent(),
@@ -73,6 +73,7 @@ class ListingService(private val jdbc: NamedParameterJdbcTemplate) {
                 .addValue("title", request.title.trim())
                 .addValue("description", request.description)
                 .addValue("channel", request.channel)
+                .addValue("slug", "${request.title.lowercase().replace(Regex("[^a-z0-9]+"), "-").trim('-').take(140)}-${id.toString().take(8)}")
                 .addValue("creator", principal.userId),
         ).also { if (it == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND, "Property not found") }
         return get(principal, id)
@@ -103,6 +104,7 @@ class ListingService(private val jdbc: NamedParameterJdbcTemplate) {
             UPDATE listings
             SET status = :status,
                 published_at = CASE WHEN :status = 'PUBLISHED' THEN COALESCE(published_at, NOW()) ELSE published_at END,
+                public_slug = CASE WHEN :status = 'PUBLISHED' THEN COALESCE(public_slug, id::text) ELSE public_slug END,
                 updated_at = NOW()
             WHERE id = :id AND organization_id = :org
             """.trimIndent(),
