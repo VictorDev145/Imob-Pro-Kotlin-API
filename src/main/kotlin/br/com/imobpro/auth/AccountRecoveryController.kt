@@ -20,9 +20,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.security.MessageDigest
 import java.security.SecureRandom
-import java.time.Instant
 import java.util.Base64
-import java.util.UUID
 
 data class ForgotPasswordRequest(
     @field:Email @field:NotBlank @field:Size(max = 254) val email: String,
