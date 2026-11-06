@@ -3,6 +3,8 @@
 ## Entregue nesta branch
 - Registro transacional cria organização, usuário e membership OWNER.
 - Login valida credenciais e membership ativa; organizationId deve ser informado quando a identidade possuir mais de uma empresa ativa.
+- Seleção de empresa valida novamente email/senha e lista somente memberships ativas.
+- Refresh bloqueia sessões de usuários, empresas ou memberships desativadas e serializa a rotação do refresh token.
 - Access tokens opacos com validade de 15 minutos; refresh tokens com validade de 30 dias e rotação.
 - Apenas hashes SHA-256 dos tokens são persistidos; senhas usam BCrypt com custo 12.
 - Filtro carrega userId, organizationId e role da sessão e membership persistidas.
@@ -13,6 +15,7 @@
 ## Endpoints
 - POST /api/v1/auth/register
 - POST /api/v1/auth/login
+- POST /api/v1/auth/organizations (valida credenciais e lista empresas ativas para seleção)
 - POST /api/v1/auth/refresh
 - POST /api/v1/auth/logout
 - GET /api/v1/auth/me
