@@ -710,10 +710,23 @@ app.patch("/api/admin/leads/:id", requireCsrf, async (req, res) => {
 
 app.get("/media/property/:propertyId/:imageId", async (req, res) => {
   try {
-    const result = await authenticatedCall(req, "/api/v1/properties/" + encodeURIComponent(req.params.propertyId) +
-      "/images/" + encodeURIComponent(req.params.imageId) + "/content");
-    if (result.status !== 200) return sendApiResult(res, result);
-    return res.send(result.data);
+    const path = "/api/v1/properties/" + encodeURIComponent(req.params.propertyId) +
+      "/images/" + encodeURIComponent(req.params.imageId) + "/content";
+    if (!req.session.accessToken) return res.sendStatus(401);
+    let upstream = await fetch(apiBase + path, {
+      headers: { authorization: "Bearer " + req.session.accessToken },
+      signal: AbortSignal.timeout(15000),
+    });
+    if (upstream.status === 401 && await refreshSession(req)) {
+      upstream = await fetch(apiBase + path, {
+        headers: { authorization: "Bearer " + req.session.accessToken },
+        signal: AbortSignal.timeout(15000),
+      });
+    }
+    if (!upstream.ok) return res.sendStatus(upstream.status);
+    res.set("content-type", upstream.headers.get("content-type") || "application/octet-stream");
+    res.set("cache-control", "private, max-age=300");
+    return res.send(Buffer.from(await upstream.arrayBuffer()));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Imagem indisponível."); }
 });
 
