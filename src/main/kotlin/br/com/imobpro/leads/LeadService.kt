@@ -1,6 +1,7 @@
 package br.com.imobpro.leads
 
 import br.com.imobpro.auth.TenantPrincipal
+import br.com.imobpro.automations.AutomationEventWriter
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
@@ -10,7 +11,10 @@ import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
 @Service
-class LeadService(private val jdbc: NamedParameterJdbcTemplate) {
+class LeadService(
+    private val jdbc: NamedParameterJdbcTemplate,
+    private val automationEvents: AutomationEventWriter,
+) {
     @Transactional
     fun create(principal: TenantPrincipal, request: CreateLeadRequest): LeadResponse {
         if (request.propertyId != null) {
@@ -48,6 +52,10 @@ class LeadService(private val jdbc: NamedParameterJdbcTemplate) {
                 .addValue("source", request.source)
                 .addValue("message", request.message)
                 .addValue("propertyId", request.propertyId),
+        )
+        automationEvents.enqueue(
+            principal, "LEAD_CREATED", "LEAD", id,
+            mapOf("leadId" to id, "propertyId" to request.propertyId),
         )
         return get(principal, id)
     }
@@ -107,6 +115,7 @@ class LeadService(private val jdbc: NamedParameterJdbcTemplate) {
                 .addValue("organizationId", principal.organizationId),
         )
         if (updated == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        automationEvents.enqueue(principal, "LEAD_STATUS_CHANGED", "LEAD", leadId, mapOf("leadId" to leadId))
     }
 
     @Transactional
