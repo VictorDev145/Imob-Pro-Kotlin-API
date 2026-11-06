@@ -96,12 +96,19 @@ def main() -> int:
                 with path.open("r", encoding="utf-8") as stream:
                     for line_number, line in enumerate(stream, start=1):
                         row = json.loads(line)
-                        if not isinstance(row, dict) or "id" not in row:
-                            raise ValueError(f"{table}:{line_number}: expected object with an id")
-                        legacy_id = str(row["id"])
-                        row_hash = hashlib.sha256(
-                            json.dumps(row, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode()
-                        ).hexdigest()
+                        if not isinstance(row, dict):
+                            raise ValueError(f"{table}:{line_number}: expected a JSON object")
+                        canonical = json.dumps(row, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+                        row_hash = hashlib.sha256(canonical.encode()).hexdigest()
+                        primary_key = manifest["tables"][table].get("primary_key", [])
+                        if primary_key and all(row.get(key) is not None for key in primary_key):
+                            key_values = [row[key] for key in primary_key]
+                            legacy_id = json.dumps(key_values, ensure_ascii=False, separators=(",", ":"))
+                        elif "id" in row and row["id"] is not None:
+                            legacy_id = str(row["id"])
+                        else:
+                            # Preserve keyless/composite-key rows without silently collapsing duplicates.
+                            legacy_id = f"row:{line_number}:{row_hash}"
                         cursor.execute(
                             """
                             INSERT INTO legacy_import_rows
