@@ -53,7 +53,7 @@ function requireCsrf(req, res, next) {
   if (!mutationMethods.has(req.method)) return next();
   const cookie = req.cookies?.["imobpro.csrf"] || req.get("x-csrf-cookie");
   const header = req.get("x-csrf-token");
-  if (!cookie || !header || !crypto.timingSafeEqual(Buffer.from(cookie), Buffer.from(header))) {
+  if (!cookie || !header || cookie.length !== header.length || !crypto.timingSafeEqual(Buffer.from(cookie), Buffer.from(header))) {
     return fail(res, 403, "CSRF_INVALID", "Atualize o token CSRF e tente novamente.");
   }
   next();
@@ -177,20 +177,19 @@ app.post("/api/auth/logout", requireCsrf, async (req, res) => {
 app.use("/api", async (req, res, next) => {
   if (req.path === "/csrf" || req.path.startsWith("/auth/")) return next();
   if (mutationMethods.has(req.method)) {
-    let rejected = false;
-    requireCsrf(req, res, () => {});
     const cookie = req.cookies?.["imobpro.csrf"] || req.get("x-csrf-cookie");
     const header = req.get("x-csrf-token");
     if (!cookie || !header || cookie.length !== header.length ||
         !crypto.timingSafeEqual(Buffer.from(cookie), Buffer.from(header))) {
-      rejected = true;
+      return fail(res, 403, "CSRF_INVALID", "Token CSRF inválido.");
     }
-    if (rejected) return fail(res, 403, "CSRF_INVALID", "Token CSRF inválido.");
   }
-  const route = matchLegacyRoute(req.method, req.path);
+  const legacyPath = req.baseUrl + req.path;
+  const route = matchLegacyRoute(req.method, legacyPath);
   if (!route) return fail(res, 501, "LEGACY_ROUTE_NOT_MAPPED",
     "Este endpoint legado ainda não possui adaptador validado. Nenhuma chamada foi encaminhada.");
   try {
+    if (route.target === "/api/v1/health") return sendApiResult(res, await apiCall(route.target));
     const target = route.target + (req.url.includes("?") ? req.url.slice(req.url.indexOf("?")) : "");
     const payload = req.body instanceof Buffer ? req.body : req.body && Object.keys(req.body).length ? toCamel(req.body) : undefined;
     const result = await authenticatedCall(req, target, { method: req.method, body: payload,
