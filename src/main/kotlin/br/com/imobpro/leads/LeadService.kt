@@ -108,7 +108,10 @@ class LeadService(private val jdbc: NamedParameterJdbcTemplate) {
                     .addValue("userId", assignedToUserId),
             ) { rs, _ -> rs.getInt(1) }.isNotEmpty()
             if (!activeMembership) {
-                throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Assignee is not an active member of this organization")
+                throw ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Assignee is not an active member of this organization",
+                )
             }
         }
         val updated = jdbc.update(
