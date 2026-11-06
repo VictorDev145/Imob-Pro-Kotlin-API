@@ -2,6 +2,7 @@ package br.com.imobpro.properties
 
 import jakarta.validation.constraints.DecimalMin
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import java.math.BigDecimal
@@ -36,8 +37,11 @@ data class SavePropertyRequest(
     val state: String,
     @field:Size(max = 12)
     val postalCode: String? = null,
+    @field:Min(0)
     val bedrooms: Int? = null,
+    @field:Min(0)
     val bathrooms: Int? = null,
+    @field:Min(0)
     val parkingSpaces: Int? = null,
     @field:DecimalMin("0.01")
     val builtArea: BigDecimal? = null,
