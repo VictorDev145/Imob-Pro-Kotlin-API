@@ -32,3 +32,11 @@ test("legacy JSON field names are translated recursively", () => {
     nested_value: [{ user_name: "Ana" }],
   });
 });
+
+test("core CRM, privacy and owner routes are explicit", () => {
+  assert.equal(matchLegacyRoute("GET", "/api/agent/leads").target, "/api/v1/leads?assignedToMe=true");
+  assert.equal(matchLegacyRoute("GET", "/api/agent/tasks").target, "/api/v1/crm/tasks?assignedToMe=true");
+  assert.equal(matchLegacyRoute("GET", "/api/admin/property-analytics/abc").target, "/api/v1/analytics/properties/abc");
+  assert.equal(matchLegacyRoute("POST", "/api/owner/properties/abc/images").target, "/api/v1/properties/abc/images");
+  assert.equal(matchLegacyRoute("PATCH", "/api/admin/properties/abc/status").target, "/api/v1/listings/by-property/abc/status");
+});
