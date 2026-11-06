@@ -73,6 +73,7 @@ def main() -> int:
     connection.row_factory = sqlite3.Row
     connection.execute("PRAGMA query_only = ON")
     connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute("BEGIN")  # pin one consistent read snapshot for the whole export
     integrity = connection.execute("PRAGMA integrity_check").fetchone()[0]
     if integrity != "ok":
         raise RuntimeError(f"SQLite integrity_check failed: {integrity}")
@@ -132,6 +133,11 @@ def main() -> int:
         "created_at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
         "source_database": database.name,
         "source_database_sha256": sha256(database),
+        "source_sidecars": {
+            suffix: {"sha256": sha256(Path(str(database) + suffix)), "size_bytes": Path(str(database) + suffix).stat().st_size}
+            for suffix in ("-wal", "-shm")
+            if Path(str(database) + suffix).is_file()
+        },
         "sqlite_integrity_check": integrity,
         "sqlite_foreign_key_violations": 0,
         "tables": table_manifest,
