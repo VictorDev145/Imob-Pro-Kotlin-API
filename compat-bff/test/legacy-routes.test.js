@@ -180,3 +180,21 @@ test("password reset emails have a first-party page and CSRF-protected form", ()
   assert.match(server, /fetch\("\/api\/auth\/reset-password"/);
   assert.match(server, /minlength="12"/);
 });
+
+
+test("email verification links have a first-party page and CSRF-protected adapter", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  const verificationController = readFileSync(
+    new URL("../../src/main/kotlin/br/com/imobpro/auth/EmailVerificationController.kt", import.meta.url),
+    "utf8",
+  );
+  const recoveryController = readFileSync(
+    new URL("../../src/main/kotlin/br/com/imobpro/auth/AccountRecoveryController.kt", import.meta.url),
+    "utf8",
+  );
+  assert.match(server, /app\.get\("\/verify-email"/);
+  assert.match(server, /app\.post\("\/api\/auth\/email-verification\/confirm", authLimiter, requireCsrf/);
+  assert.match(server, /fetch\("\/api\/auth\/email-verification\/confirm"/);
+  assert.match(verificationController, /app\.public-base-url:http:\/\/localhost:3100/);
+  assert.match(recoveryController, /app\.public-base-url:http:\/\/localhost:3100/);
+});
