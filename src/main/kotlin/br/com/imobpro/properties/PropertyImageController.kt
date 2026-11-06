@@ -1,8 +1,7 @@
 package br.com.imobpro.properties
 
 import br.com.imobpro.auth.TenantPrincipal
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.core.io.FileSystemResource
+import br.com.imobpro.storage.ObjectStorage
 import org.springframework.core.io.Resource
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
@@ -24,9 +23,6 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.multipart.MultipartFile
 import org.springframework.web.server.ResponseStatusException
-import java.nio.file.Files
-import java.nio.file.Path
-import java.nio.file.StandardCopyOption
 import java.time.Instant
 import java.util.UUID
 
@@ -45,9 +41,8 @@ data class PropertyImageResponse(
 class PropertyImageService(
     private val jdbc: NamedParameterJdbcTemplate,
     private val propertyService: PropertyService,
-    @Value("\${imobpro.storage.local.root:./var/imobpro/uploads}") root: String,
+    private val storage: ObjectStorage,
 ) {
-    private val storageRoot: Path = Path.of(root).toAbsolutePath().normalize()
     private val maxFileBytes = 10L * 1024 * 1024
 
     fun list(principal: TenantPrincipal, propertyId: UUID): List<PropertyImageResponse> {
@@ -84,7 +79,7 @@ class PropertyImageService(
                 .addValue("property", propertyId),
             Int::class.java,
         ) ?: 0
-        val written = mutableListOf<Path>()
+        val written = mutableListOf<String>()
         try {
             Files.createDirectories(storageRoot.resolve(principal.organizationId.toString()))
             files.forEachIndexed { index, file ->
@@ -94,13 +89,8 @@ class PropertyImageService(
                 val detected = detectImageType(file)
                 val imageId = UUID.randomUUID()
                 val key = "${principal.organizationId}/$imageId.${detected.second}"
-                val target = storageRoot.resolve(key).normalize()
-                if (!target.startsWith(storageRoot)) {
-                    throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid storage key")
-                }
-                Files.createDirectories(target.parent)
-                file.inputStream.use { input -> Files.copy(input, target, StandardCopyOption.REPLACE_EXISTING) }
-                written.add(target)
+                file.inputStream.use { input -> storage.put(key, input, file.size) }
+                written.add(key)
                 jdbc.update(
                     """
                     INSERT INTO property_images (
@@ -122,7 +112,7 @@ class PropertyImageService(
                 )
             }
         } catch (exception: Exception) {
-            written.forEach { Files.deleteIfExists(it) }
+            written.forEach { storage.delete(it) }
             throw exception
         }
         return list(principal, propertyId)
@@ -139,11 +129,8 @@ class PropertyImageService(
                 .addValue("org", principal.organizationId).addValue("property", propertyId),
         ) { rs, _ -> rs.getString("storage_key") to rs.getString("content_type") }
             .singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val target = storageRoot.resolve(row.first).normalize()
-        if (!target.startsWith(storageRoot) || !Files.isRegularFile(target)) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        }
-        return FileSystemResource(target) to row.second
+        val resource = storage.get(row.first) ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        return resource to row.second
     }
 
     fun delete(principal: TenantPrincipal, propertyId: UUID, imageId: UUID) {
@@ -158,8 +145,7 @@ class PropertyImageService(
                 .addValue("org", principal.organizationId).addValue("property", propertyId),
         ) { rs, _ -> rs.getString(1) }.singleOrNull()
             ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val target = storageRoot.resolve(key).normalize()
-        if (target.startsWith(storageRoot)) Files.deleteIfExists(target)
+        storage.delete(key)
     }
 
     private fun detectImageType(file: MultipartFile): Pair<String, String> {
