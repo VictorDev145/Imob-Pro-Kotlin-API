@@ -130,7 +130,7 @@ class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
             JOIN users u ON u.id = m.user_id
             WHERE m.organization_id = :org AND m.status = 'ACTIVE'
               AND u.status = 'ACTIVE' AND u.id <> :user
-              AND (:includeCustomers = TRUE OR m.role <> 'CUSTOMER')
+              AND (:includeCustomers = TRUE OR m.role NOT IN ('CUSTOMER', 'PROPERTY_OWNER'))
             ORDER BY CASE m.role WHEN 'ADMIN' THEN 0 WHEN 'MANAGER' THEN 1 WHEN 'AGENT' THEN 2 ELSE 3 END,
                      u.full_name
             """.trimIndent(),
