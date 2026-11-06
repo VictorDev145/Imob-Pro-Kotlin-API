@@ -189,9 +189,52 @@ app.post("/api/auth/login", authLimiter, requireCsrf, async (req, res) => {
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível concluir o login."); }
 });
 
-app.post("/api/auth/register", authLimiter, requireCsrf, async (_req, res) => {
-  return fail(res, 409, "REGISTRATION_FLOW_REQUIRED",
-    "O cadastro legado criava clientes sem organização. Use o fluxo de cadastro de organização/convite; não criaremos um proprietário por engano.");
+app.post("/api/auth/register", authLimiter, requireCsrf, async (req, res) => {
+  const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
+  if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
+  try {
+    const body = req.body || {};
+    const result = await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/customers/register", {
+      method: "POST",
+      body: {
+        fullName: body.name || body.fullName,
+        email: body.email,
+        password: body.password,
+        phone: body.phone || body.whatsapp || null,
+      },
+    });
+    if (result.status !== 200) return sendApiResult(res, result);
+    await new Promise((resolve, reject) => req.session.regenerate(error => error ? reject(error) : resolve()));
+    req.session.accessToken = result.data.accessToken;
+    req.session.refreshToken = result.data.refreshToken;
+    req.session.accessExpiresAt = result.data.expiresAt;
+    const me = await authenticatedCall(req, "/api/v1/auth/me");
+    return res.status(201).json(toSnake(me.data));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível concluir o cadastro."); }
+});
+
+app.post("/api/auth/forgot-password", authLimiter, requireCsrf, async (req, res) => {
+  try {
+    return sendApiResult(res, await apiCall("/api/v1/auth/password/forgot", {
+      method: "POST", body: { email: req.body?.email },
+    }));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Serviço de recuperação indisponível."); }
+});
+
+app.post("/api/auth/reset-password", authLimiter, requireCsrf, async (req, res) => {
+  try {
+    return sendApiResult(res, await apiCall("/api/v1/auth/password/reset", {
+      method: "POST", body: { token: req.body?.token, newPassword: req.body?.password || req.body?.newPassword },
+    }));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Serviço de recuperação indisponível."); }
+});
+
+app.post("/api/auth/change-password", requireCsrf, async (req, res) => {
+  try {
+    return sendApiResult(res, await authenticatedCall(req, "/api/v1/me/password", {
+      method: "POST", body: toCamel(req.body || {}),
+    }));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível alterar a senha."); }
 });
 
 app.get("/api/auth/me", async (req, res) => {
@@ -212,6 +255,74 @@ app.post("/api/auth/logout", requireCsrf, async (req, res) => {
     res.clearCookie(production ? "__Host-imobpro.sid" : "imobpro.sid", { path: "/" });
     return res.json({ ok: true });
   } catch { return fail(res, 502, "LOGOUT_FAILED", "Não foi possível encerrar a sessão."); }
+});
+
+app.get("/api/messages/contacts", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/conversations/contacts");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data || []).map(person => ({
+      id: person.userId,
+      name: person.fullName,
+      role: String(person.role || "").toLowerCase(),
+    })));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Chat indisponível."); }
+});
+
+app.get("/api/messages/unread", async (req, res) => {
+  try { return sendApiResult(res, await authenticatedCall(req, "/api/v1/conversations/unread")); }
+  catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Chat indisponível."); }
+});
+
+app.get("/api/messages", async (req, res) => {
+  const withUser = req.query.with;
+  if (!withUser) return res.json([]);
+  try {
+    const conversations = await authenticatedCall(req, "/api/v1/conversations?withUserId=" + encodeURIComponent(withUser));
+    if (conversations.status !== 200) return sendApiResult(res, conversations);
+    if (!Array.isArray(conversations.data) || !conversations.data.length) return res.json([]);
+    const result = await authenticatedCall(req, "/api/v1/conversations/" + encodeURIComponent(conversations.data[0].id) + "/messages");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data || []).map(message => ({
+      id: message.id,
+      sender_id: message.senderUserId,
+      body: message.body,
+      created_at: message.createdAt,
+    })));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Chat indisponível."); }
+});
+
+app.post("/api/messages", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const recipientId = body.recipient_id || body.recipientId;
+    if (!recipientId || !body.body) return fail(res, 400, "INVALID_MESSAGE", "Destinatário e mensagem são obrigatórios.");
+    const query = await authenticatedCall(req, "/api/v1/conversations?withUserId=" + encodeURIComponent(recipientId));
+    if (query.status !== 200) return sendApiResult(res, query);
+    let conversation = Array.isArray(query.data) ? query.data[0] : null;
+    if (!conversation) {
+      const created = await authenticatedCall(req, "/api/v1/conversations", {
+        method: "POST",
+        body: {
+          subject: body.property_id ? "Interesse em imóvel " + body.property_id : "Atendimento",
+          leadId: body.lead_id || null,
+          participantUserIds: [recipientId],
+        },
+      });
+      if (created.status !== 201) return sendApiResult(res, created);
+      conversation = created.data;
+    }
+    const sent = await authenticatedCall(req, "/api/v1/conversations/" + encodeURIComponent(conversation.id) + "/messages", {
+      method: "POST", body: { body: body.body },
+    });
+    if (sent.status !== 201) return sendApiResult(res, sent);
+    return res.status(201).json({
+      id: sent.data.id,
+      sender_id: sent.data.senderUserId,
+      body: sent.data.body,
+      created_at: sent.data.createdAt,
+    });
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível enviar a mensagem."); }
 });
 
 app.use("/api", async (req, res, next) => {
