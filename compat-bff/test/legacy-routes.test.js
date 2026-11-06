@@ -145,3 +145,24 @@ test("property owner membership migration and image access are present", () => {
   assert.match(propertyImages, /PROPERTY_OWNER/);
   assert.match(migration, /PROPERTY_OWNER/);
 });
+
+
+test("every enabled legacy contract has a concrete adapter or route mapping", () => {
+  const coverage = JSON.parse(readFileSync(new URL("../legacy-route-coverage.json", import.meta.url), "utf8"));
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  for (const contract of coverage) {
+    if (contract.status === "disabled") continue;
+    if (contract.status === "mapped") {
+      const samplePath = contract.path.replace(/:[^/]+/g, "contract-id");
+      assert.ok(
+        matchLegacyRoute(contract.method, samplePath),
+        `missing route mapping: ${contract.method} ${contract.path}`,
+      );
+    } else {
+      assert.ok(
+        server.includes(JSON.stringify(contract.path)) || server.includes("'" + contract.path + "'"),
+        `missing explicit BFF adapter: ${contract.method} ${contract.path}`,
+      );
+    }
+  }
+});
