@@ -2,6 +2,7 @@ package br.com.imobpro.auth
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
@@ -11,6 +12,9 @@ import org.springframework.http.HttpEntity
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
+import org.springframework.http.MediaType
+import br.com.imobpro.properties.PropertyResponse
+import br.com.imobpro.properties.SavePropertyRequest
 import org.springframework.test.context.DynamicPropertyRegistry
 import org.springframework.test.context.DynamicPropertySource
 import org.testcontainers.containers.PostgreSQLContainer
@@ -59,6 +63,47 @@ class AuthFlowIntegrationTest {
         assertEquals(HttpStatus.OK, profile.statusCode)
         assertEquals(email, profile.body!!.email)
         assertEquals("OWNER", profile.body!!.role)
+
+        val propertyRequest = SavePropertyRequest(
+            propertyType = "APARTMENT",
+            purpose = "SALE",
+            title = "Apartamento de integração",
+            city = "Fortaleza",
+            state = "CE",
+        )
+        val propertyHeaders = HttpHeaders().apply {
+            setBearerAuth(tokens.accessToken)
+            contentType = MediaType.APPLICATION_JSON
+        }
+        val createdProperty = rest.postForEntity(
+            url("/api/v1/properties"),
+            HttpEntity(propertyRequest, propertyHeaders),
+            PropertyResponse::class.java,
+        )
+        assertEquals(HttpStatus.CREATED, createdProperty.statusCode)
+        val property = createdProperty.body!!
+        assertTrue(property.referenceCode.startsWith("IMB-"))
+
+        val secondRegistration = rest.postForEntity(
+            url("/api/v1/auth/register"),
+            RegisterRequest(
+                fullName = "Another Tenant",
+                email = "other-${UUID.randomUUID()}@example.com",
+                password = "AnotherStrongPassword123",
+                organizationName = "Other Realty",
+            ),
+            TokenResponse::class.java,
+        )
+        val otherTenantHeaders = HttpHeaders().apply {
+            setBearerAuth(secondRegistration.body!!.accessToken)
+        }
+        val crossTenantRead = rest.exchange(
+            url("/api/v1/properties/${property.id}"),
+            HttpMethod.GET,
+            HttpEntity<Void>(otherTenantHeaders),
+            String::class.java,
+        )
+        assertEquals(HttpStatus.NOT_FOUND, crossTenantRead.statusCode)
 
         val logout = rest.exchange(
             url("/api/v1/auth/logout"),
