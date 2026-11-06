@@ -44,7 +44,7 @@ data class PropertyImageResponse(
 class PropertyImageService(
     private val jdbc: NamedParameterJdbcTemplate,
     private val propertyService: PropertyService,
-    @Value("${imobpro.storage.local.root:./var/imobpro/uploads}") root: String,
+    @Value("\${imobpro.storage.local.root:./var/imobpro/uploads}") root: String,
 ) {
     private val storageRoot: Path = Path.of(root).toAbsolutePath().normalize()
     private val maxFileBytes = 10L * 1024 * 1024
