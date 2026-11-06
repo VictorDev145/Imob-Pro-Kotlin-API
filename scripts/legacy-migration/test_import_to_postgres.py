@@ -22,6 +22,7 @@ class ImportManifestTest(unittest.TestCase):
             tables[name] = {
                 "file": filename,
                 "rows": 1,
+                "primary_key": ["id"],
                 "sha256": hashlib.sha256(data).hexdigest(),
             }
         manifest = {"format_version": 1, "source_database_sha256": "a" * 64, "tables": tables}
