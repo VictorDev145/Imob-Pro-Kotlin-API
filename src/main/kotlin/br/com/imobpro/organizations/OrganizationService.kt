@@ -1,13 +1,13 @@
 package br.com.imobpro.organizations
 
 import br.com.imobpro.auth.TenantPrincipal
+import java.util.UUID
 import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import java.util.UUID
 
 @Service
 class OrganizationService(private val jdbc: JdbcTemplate) {
