@@ -35,7 +35,7 @@ jobs:
           cache-dependency-path: compat-bff/package.json
       - name: Test compatibility BFF
         working-directory: compat-bff
-        run: npm install --no-audit --no-fund && npm test
+        run: npm install --no-audit --no-fund && node --check src/server.js && node --check src/legacy-routes.js && npm test
       - name: Build Docker image
         run: docker build -t imob-pro-kotlin-api:ci .
       - name: Build compatibility BFF image
