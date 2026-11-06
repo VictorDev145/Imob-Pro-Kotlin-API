@@ -121,18 +121,21 @@ class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
             conversationMapper,
         )
 
-    fun contacts(principal: TenantPrincipal): List<ConversationContact> =
-        jdbc.query(
+    fun contacts(principal: TenantPrincipal): List<ConversationContact> {
+        val includeCustomers = principal.role in setOf("OWNER", "ADMIN", "MANAGER", "AGENT")
+        return jdbc.query(
             """
             SELECT u.id, u.full_name, m.role
             FROM organization_memberships m
             JOIN users u ON u.id = m.user_id
             WHERE m.organization_id = :org AND m.status = 'ACTIVE'
               AND u.status = 'ACTIVE' AND u.id <> :user
-              AND m.role IN ('OWNER', 'ADMIN', 'MANAGER', 'AGENT')
-            ORDER BY CASE m.role WHEN 'AGENT' THEN 0 WHEN 'MANAGER' THEN 1 ELSE 2 END, u.full_name
+              AND (:includeCustomers = TRUE OR m.role <> 'CUSTOMER')
+            ORDER BY CASE m.role WHEN 'ADMIN' THEN 0 WHEN 'MANAGER' THEN 1 WHEN 'AGENT' THEN 2 ELSE 3 END,
+                     u.full_name
             """.trimIndent(),
-            MapSqlParameterSource().addValue("org", principal.organizationId).addValue("user", principal.userId),
+            MapSqlParameterSource().addValue("org", principal.organizationId)
+                .addValue("user", principal.userId).addValue("includeCustomers", includeCustomers),
             RowMapper { rs, _ ->
                 ConversationContact(
                     rs.getObject("id", UUID::class.java),
@@ -141,6 +144,7 @@ class MessagingService(private val jdbc: NamedParameterJdbcTemplate) {
                 )
             },
         )
+    }
 
     fun unreadCount(principal: TenantPrincipal): Long =
         jdbc.queryForObject(
