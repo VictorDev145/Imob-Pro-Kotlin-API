@@ -931,7 +931,7 @@ app.get("/api/me/profile", async (req, res) => {
       name: result.data.fullName,
       email: result.data.email,
       phone: result.data.phone,
-      role: String(result.data.role || "").toLowerCase(),
+      role: String(result.data.role || "").toUpperCase() === "PROPERTY_OWNER" ? "owner" : String(result.data.role || "").toLowerCase(),
     });
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Perfil indisponível."); }
 });
