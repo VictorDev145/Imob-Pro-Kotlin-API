@@ -13,6 +13,9 @@ import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
+import br.com.imobpro.leads.CreateLeadRequest
+import br.com.imobpro.leads.LeadResponse
+import br.com.imobpro.leads.UpdateLeadStatusRequest
 import br.com.imobpro.properties.PropertyResponse
 import br.com.imobpro.properties.SavePropertyRequest
 import org.springframework.test.context.DynamicPropertyRegistry
@@ -84,6 +87,35 @@ class AuthFlowIntegrationTest {
         val property = createdProperty.body!!
         assertTrue(property.referenceCode.startsWith("IMB-"))
 
+        val leadCreated = rest.postForEntity(
+            url("/api/v1/leads"),
+            HttpEntity(
+                CreateLeadRequest(
+                    fullName = "Potential Buyer",
+                    email = "buyer@example.com",
+                    source = "WEBSITE",
+                    propertyId = property.id,
+                ),
+                propertyHeaders,
+            ),
+            LeadResponse::class.java,
+        )
+        assertEquals(HttpStatus.CREATED, leadCreated.statusCode)
+        val lead = leadCreated.body!!
+        assertEquals(property.id, lead.propertyId)
+
+        val statusHeaders = HttpHeaders().apply {
+            setBearerAuth(tokens.accessToken)
+            contentType = MediaType.APPLICATION_JSON
+        }
+        val leadStatus = rest.exchange(
+            url("/api/v1/leads/${lead.id}/status"),
+            HttpMethod.PATCH,
+            HttpEntity(UpdateLeadStatusRequest("CONTACTED"), statusHeaders),
+            Void::class.java,
+        )
+        assertEquals(HttpStatus.NO_CONTENT, leadStatus.statusCode)
+
         val secondRegistration = rest.postForEntity(
             url("/api/v1/auth/register"),
             RegisterRequest(
@@ -104,6 +136,14 @@ class AuthFlowIntegrationTest {
             String::class.java,
         )
         assertEquals(HttpStatus.NOT_FOUND, crossTenantRead.statusCode)
+
+        val crossTenantLeadRead = rest.exchange(
+            url("/api/v1/leads/${lead.id}"),
+            HttpMethod.GET,
+            HttpEntity<Void>(otherTenantHeaders),
+            String::class.java,
+        )
+        assertEquals(HttpStatus.NOT_FOUND, crossTenantLeadRead.statusCode)
 
         val logout = rest.exchange(
             url("/api/v1/auth/logout"),
