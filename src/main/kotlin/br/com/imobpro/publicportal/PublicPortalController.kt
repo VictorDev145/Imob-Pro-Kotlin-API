@@ -126,7 +126,7 @@ class PublicPortalService(
         validateOrganization(organizationSlug)
         val row = jdbc.query(
             """
-            SELECT l.id, l.public_slug, l.title, l.description,
+            SELECT l.id, p.id AS property_id, l.public_slug, l.title, l.description,
                    p.property_type, p.purpose, p.city, p.state, p.neighborhood,
                    p.bedrooms, p.bathrooms, p.parking_spaces, p.built_area, p.land_area,
                    p.sale_price, p.rent_price, l.published_at
@@ -147,7 +147,7 @@ class PublicPortalService(
         validateOrganization(organizationSlug)
         val row = jdbc.query(
             """
-            SELECT l.id, l.public_slug, l.title, l.description,
+            SELECT l.id, p.id AS property_id, l.public_slug, l.title, l.description,
                    p.property_type, p.purpose, p.city, p.state, p.neighborhood,
                    p.bedrooms, p.bathrooms, p.parking_spaces, p.built_area, p.land_area,
                    p.sale_price, p.rent_price, l.published_at
