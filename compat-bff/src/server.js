@@ -5,9 +5,11 @@ import connectPgSimple from "connect-pg-simple";
 import pg from "pg";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
+import { RedisStore } from "rate-limit-redis";
+import { createClient } from "redis";
 import { csrfToken, matchLegacyRoute, toCamel, toSnake } from "./legacy-routes.js";
 
-const required = ["DATABASE_URL", "SESSION_SECRET", "KOTLIN_API_URL"];
+const required = ["DATABASE_URL", "SESSION_SECRET", "KOTLIN_API_URL", "REDIS_URL"];
 for (const key of required) {
   if (!process.env[key]) throw new Error("Missing required environment variable: " + key);
 }
@@ -19,6 +21,13 @@ const pool = new pg.Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.PGSSL === "true" ? { rejectUnauthorized: true } : undefined,
   max: 10,
+});
+const redisClient = createClient({ url: process.env.REDIS_URL });
+redisClient.on("error", () => process.stderr.write("Redis connection error\\n"));
+await redisClient.connect();
+const sharedLimiterStore = new RedisStore({
+  sendCommand: (...args) => redisClient.sendCommand(args),
+  prefix: "imobpro:ratelimit:",
 });
 const PgStore = connectPgSimple(session);
 const app = express();
@@ -43,7 +52,8 @@ app.use(session({
   },
 }));
 
-const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-7", legacyHeaders: false });
+const authLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: "draft-7", legacyHeaders: false, store: sharedLimiterStore });
+const apiLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 1200, standardHeaders: "draft-7", legacyHeaders: false, store: sharedLimiterStore });
 const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function legacyUser(user) {
@@ -72,6 +82,8 @@ app.use((req, _res, next) => {
   }));
   next();
 });
+
+app.use("/api", apiLimiter);
 
 app.get("/api/csrf", (req, res) => {
   const token = csrfToken();
