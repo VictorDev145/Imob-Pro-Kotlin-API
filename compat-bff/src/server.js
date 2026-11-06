@@ -526,6 +526,23 @@ async function loadLegacyProperties(req) {
   return { status: 200, data: mapped };
 }
 
+app.get("/api/admin/activity", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/dashboard/activity?limit=100");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data || []).map(item => ({
+      id: item.id,
+      user_id: item.actorUserId,
+      user_name: item.actorName || "Sistema",
+      entity_type: item.resourceType,
+      entity_id: item.resourceId,
+      action: item.action,
+      details: item.metadata?.details ?? JSON.stringify(item.metadata || {}),
+      created_at: item.createdAt,
+    })));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Histórico de atividades indisponível."); }
+});
+
 app.get("/api/admin/stats", async (req, res) => {
   try {
     const result = await authenticatedCall(req, "/api/v1/dashboard/summary");
