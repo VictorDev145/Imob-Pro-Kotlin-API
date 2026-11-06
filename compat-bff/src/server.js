@@ -208,6 +208,16 @@ app.get("/api/properties", async (req, res) => {
     if (req.query.offset) query.set("offset", String(req.query.offset));
     if (req.query.limit) query.set("limit", String(req.query.limit));
     if (req.query.city) query.set("city", String(req.query.city));
+    if (req.query.neighborhood) query.set("neighborhood", String(req.query.neighborhood));
+    if (req.query.q) query.set("q", String(req.query.q));
+    if (req.query.minPrice) query.set("minPrice", String(req.query.minPrice));
+    if (req.query.maxPrice) query.set("maxPrice", String(req.query.maxPrice));
+    if (req.query.bedrooms) query.set("bedrooms", String(req.query.bedrooms));
+    if (req.query.parking) query.set("parkingSpaces", String(req.query.parking));
+    if (req.query.type) {
+      const type = String(req.query.type).toLowerCase();
+      query.set("propertyType", ({ apartamento: "APARTMENT", casa: "HOUSE", comercial: "COMMERCIAL", terreno: "LAND", rural: "RURAL" })[type] || "OTHER");
+    }
     if (req.query.purpose) query.set("purpose", String(req.query.purpose).toLowerCase() === "aluguel" ? "RENT" : "SALE");
     const result = await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/listings" + (query.size ? "?" + query.toString() : ""));
     if (result.status !== 200) return sendApiResult(res, result);
