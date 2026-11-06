@@ -1,6 +1,5 @@
 package br.com.imobpro.auth
 
-import br.com.imobpro.leads.CreateLeadRequest
 import br.com.imobpro.leads.LeadResponse
 import br.com.imobpro.leads.UpdateLeadStatusRequest
 import br.com.imobpro.listings.CreateListingRequest
@@ -105,7 +104,7 @@ class AuthFlowIntegrationTest {
             rest.postForEntity(
                 url("/api/v1/leads"),
                 HttpEntity(
-                    CreateLeadRequest(
+                    br.com.imobpro.leads.CreateLeadRequest(
                         fullName = "Potential Buyer",
                         email = "buyer@example.com",
                         source = "WEBSITE",
