@@ -136,6 +136,22 @@ async function authenticatedCall(req, path, options = {}) {
   return result;
 }
 
+async function legacyIdForUser(userId) {
+  await pool.query(
+    "INSERT INTO legacy_user_id_map (user_id) VALUES ($1) ON CONFLICT (user_id) DO NOTHING",
+    [userId],
+  );
+  const result = await pool.query("SELECT legacy_id FROM legacy_user_id_map WHERE user_id = $1", [userId]);
+  if (!result.rowCount) throw new Error("Legacy user alias could not be resolved");
+  return Number(result.rows[0].legacy_id);
+}
+
+async function userIdForLegacyId(legacyId) {
+  if (!/^[1-9][0-9]*$/.test(String(legacyId || ""))) return null;
+  const result = await pool.query("SELECT user_id FROM legacy_user_id_map WHERE legacy_id = $1", [String(legacyId)]);
+  return result.rows[0]?.user_id || null;
+}
+
 function sendApiResult(res, result) {
   if (result.status >= 400 && result.data && typeof result.data === "object") {
     const message = result.data.detail || result.data.message || result.data.error || "A operação não foi concluída.";
@@ -369,11 +385,14 @@ app.get("/api/messages/contacts", async (req, res) => {
   try {
     const result = await authenticatedCall(req, "/api/v1/conversations/contacts");
     if (result.status !== 200) return sendApiResult(res, result);
-    return res.json((result.data || []).map(person => ({
-      id: person.userId,
+    const contacts = await Promise.all((result.data || []).map(async person => ({
+      id: await legacyIdForUser(person.userId),
       name: person.fullName,
+      email: person.email || "",
+      phone: person.phone || "",
       role: String(person.role || "").toLowerCase(),
     })));
+    return res.json(contacts);
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Chat indisponível."); }
 });
 
@@ -383,10 +402,12 @@ app.get("/api/messages/unread", async (req, res) => {
 });
 
 app.get("/api/messages", async (req, res) => {
-  const withUser = req.query.with;
-  if (!withUser) return res.json([]);
+  const legacyRecipientId = req.query.with;
+  if (!legacyRecipientId) return res.json([]);
   try {
-    const conversations = await authenticatedCall(req, "/api/v1/conversations?withUserId=" + encodeURIComponent(withUser));
+    const recipientId = await userIdForLegacyId(legacyRecipientId);
+    if (!recipientId) return res.json([]);
+    const conversations = await authenticatedCall(req, "/api/v1/conversations?withUserId=" + encodeURIComponent(recipientId));
     if (conversations.status !== 200) return sendApiResult(res, conversations);
     if (!Array.isArray(conversations.data) || !conversations.data.length) return res.json([]);
     const conversationId = conversations.data[0].id;
@@ -397,8 +418,10 @@ app.get("/api/messages", async (req, res) => {
     return res.json((result.data || []).map(message => ({
       id: message.id,
       sender_id: message.senderUserId,
+      recipient_id: recipientId,
       body: message.body,
       created_at: message.createdAt,
+      read_at: message.senderUserId === recipientId ? null : message.createdAt,
     })));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Chat indisponível."); }
 });
@@ -406,9 +429,11 @@ app.get("/api/messages", async (req, res) => {
 app.post("/api/messages", requireCsrf, async (req, res) => {
   try {
     const body = req.body || {};
-    const recipientId = body.recipient_id || body.recipientId;
-    if (!recipientId || !body.body) return fail(res, 400, "INVALID_MESSAGE", "Destinatário e mensagem são obrigatórios.");
+    const legacyRecipientId = body.recipient_id || body.recipientId;
+    if (!legacyRecipientId || !body.body) return fail(res, 400, "INVALID_MESSAGE", "Destinatário e mensagem são obrigatórios.");
     if (String(body.body).trim().length > 2000) return fail(res, 400, "MESSAGE_TOO_LONG", "A mensagem pode ter no máximo 2.000 caracteres.");
+    const recipientId = await userIdForLegacyId(legacyRecipientId);
+    if (!recipientId) return fail(res, 404, "RECIPIENT_NOT_FOUND", "Destinatário não encontrado.");
     const query = await authenticatedCall(req, "/api/v1/conversations?withUserId=" + encodeURIComponent(recipientId));
     if (query.status !== 200) return sendApiResult(res, query);
     let conversation = Array.isArray(query.data) ? query.data[0] : null;
@@ -431,12 +456,13 @@ app.post("/api/messages", requireCsrf, async (req, res) => {
     return res.status(201).json({
       id: sent.data.id,
       sender_id: sent.data.senderUserId,
+      recipient_id: recipientId,
       body: sent.data.body,
       created_at: sent.data.createdAt,
+      read_at: null,
     });
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível enviar a mensagem."); }
 });
-
 
 function legacyStatus(value) {
   return String(value || "").toLowerCase();
