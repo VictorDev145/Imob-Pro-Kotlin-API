@@ -81,7 +81,6 @@ class PropertyImageService(
         ) ?: 0
         val written = mutableListOf<String>()
         try {
-            Files.createDirectories(storageRoot.resolve(principal.organizationId.toString()))
             files.forEachIndexed { index, file ->
                 if (file.isEmpty || file.size > maxFileBytes) {
                     throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Each image must be between 1 byte and 10 MB")
