@@ -58,6 +58,14 @@ class PropertyController(private val propertyService: PropertyService) {
         @Valid @RequestBody request: SavePropertyRequest,
     ): PropertyResponse = propertyService.update(authentication.tenantPrincipal(), propertyId, request)
 
+    @org.springframework.web.bind.annotation.PatchMapping("/{propertyId}")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    fun patch(
+        authentication: Authentication,
+        @PathVariable propertyId: UUID,
+        @Valid @RequestBody request: SavePropertyRequest,
+    ): PropertyResponse = propertyService.update(authentication.tenantPrincipal(), propertyId, request)
+
     @DeleteMapping("/{propertyId}")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
