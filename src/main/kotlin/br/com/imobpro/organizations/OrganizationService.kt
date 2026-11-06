@@ -36,7 +36,7 @@ class OrganizationService(private val jdbc: JdbcTemplate) {
     fun members(principal: TenantPrincipal): List<MemberSummary> =
         jdbc.query(
             """
-            SELECT u.id, u.full_name, u.email, m.role, m.status, m.created_at
+            SELECT u.id, u.full_name, u.email, u.phone, m.role, m.status, m.created_at
             FROM organization_memberships m
             JOIN users u ON u.id = m.user_id
             WHERE m.organization_id = ?
@@ -47,6 +47,7 @@ class OrganizationService(private val jdbc: JdbcTemplate) {
                     userId = rs.getObject("id", UUID::class.java),
                     fullName = rs.getString("full_name"),
                     email = rs.getString("email"),
+                    phone = rs.getString("phone"),
                     role = rs.getString("role"),
                     status = rs.getString("status"),
                     joinedAt = rs.getTimestamp("created_at").toInstant(),
