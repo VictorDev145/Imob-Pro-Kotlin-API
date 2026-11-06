@@ -182,12 +182,12 @@ class PropertyImageService(
 @RequestMapping("/api/v1/properties/{propertyId}/images")
 class PropertyImageController(private val service: PropertyImageService) {
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     fun list(authentication: Authentication, @PathVariable propertyId: UUID): List<PropertyImageResponse> =
         service.list(authentication.tenant(), propertyId)
 
     @PostMapping(consumes = [MediaType.MULTIPART_FORM_DATA_VALUE])
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     fun upload(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
@@ -196,7 +196,7 @@ class PropertyImageController(private val service: PropertyImageService) {
     ): List<PropertyImageResponse> = service.upload(authentication.tenant(), propertyId, files.orEmpty() + legacyImages.orEmpty())
 
     @GetMapping("/{imageId}/content")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     fun content(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
@@ -210,7 +210,7 @@ class PropertyImageController(private val service: PropertyImageService) {
     }
 
     @DeleteMapping("/{imageId}")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'PROPERTY_OWNER')")
     fun delete(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
