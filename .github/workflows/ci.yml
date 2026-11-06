@@ -23,3 +23,35 @@ jobs:
         run: gradle --no-daemon clean test bootJar
       - name: Check Kotlin formatting
         run: gradle --no-daemon ktlintCheck
+      - name: Validate legacy migration exporter
+        run: python3 -m py_compile scripts/legacy-migration/export_sqlite.py scripts/legacy-migration/test_export_sqlite.py && python3 -m unittest discover -s scripts/legacy-migration -p 'test_*.py' && python3 scripts/legacy-migration/export_sqlite.py --help
+      - name: Validate backup scripts
+        run: bash -n scripts/backup/backup_postgres.sh scripts/backup/restore_postgres.sh
+      - name: Validate legacy migration tools
+        run: python3 -m py_compile scripts/legacy-migration/*.py && python3 -m unittest discover -s scripts/legacy-migration -p 'test_*.py'
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: compat-bff/package.json
+      - name: Test compatibility BFF
+        working-directory: compat-bff
+        run: npm install --no-audit --no-fund && node --check src/server.js && node --check src/legacy-routes.js && npm test
+      - name: Validate integrated web frontend
+        run: node --check web/app.js && node --test web/test/*.test.cjs
+      - name: Build Docker image
+        run: docker build -t imob-pro-kotlin-api:ci .
+      - name: Build compatibility BFF image
+        run: docker build -t imob-pro-compat-bff:ci ./compat-bff
+      - name: Validate Windows startup script syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile('scripts/dev/start-local.ps1', [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Build integrated web image
+        run: docker build -t imob-pro-web:ci ./web

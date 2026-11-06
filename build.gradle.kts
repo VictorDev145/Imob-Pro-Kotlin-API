@@ -19,12 +19,17 @@ repositories { mavenCentral() }
 
 dependencies {
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-data-jpa")
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
+    implementation("org.springframework.boot:spring-boot-starter-mail")
     implementation("org.flywaydb:flyway-core")
     implementation("org.flywaydb:flyway-database-postgresql")
     implementation("org.postgresql:postgresql")
+    implementation(platform("software.amazon.awssdk:bom:2.31.54"))
+    implementation("software.amazon.awssdk:s3")
     implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.13")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation(kotlin("reflect"))
@@ -38,4 +43,8 @@ dependencies {
 tasks.withType<KotlinCompile> { compilerOptions { freeCompilerArgs.addAll("-Xjsr305=strict") } }
 tasks.withType<Test> { useJUnitPlatform() }
 ktlint { version.set("1.5.0") }
-detekt { buildUponDefaultConfig = true; allRules = false; config.setFrom(files("$rootDir/config/detekt/detekt.yml")) }
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    config.setFrom(files("$rootDir/config/detekt/detekt.yml"))
+}

@@ -4,3 +4,9 @@ build
 .idea
 .vscode
 *.iml
+
+.env
+.env.*
+!*.example
+var
+*.log
