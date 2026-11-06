@@ -33,6 +33,10 @@ data class DashboardSummary(
     val upcomingVisits: Long,
     val openTasks: Long,
     val activeMembers: Long,
+    val leads: Long,
+    val owners: Long,
+    val customers: Long,
+    val agents: Long,
 )
 
 data class ActivityResponse(
@@ -80,7 +84,14 @@ class DashboardAnalyticsService(
                 (SELECT COUNT(*) FROM tasks
                  WHERE organization_id = :org AND status IN ('OPEN', 'IN_PROGRESS')) AS open_tasks,
                 (SELECT COUNT(*) FROM organization_memberships
-                 WHERE organization_id = :org AND status = 'ACTIVE') AS active_members
+                 WHERE organization_id = :org AND status = 'ACTIVE') AS active_members,
+                (SELECT COUNT(*) FROM leads WHERE organization_id = :org) AS leads,
+                (SELECT COUNT(*) FROM organization_memberships
+                 WHERE organization_id = :org AND status = 'ACTIVE' AND role = 'OWNER') AS owners,
+                (SELECT COUNT(*) FROM organization_memberships
+                 WHERE organization_id = :org AND status = 'ACTIVE' AND role = 'CUSTOMER') AS customers,
+                (SELECT COUNT(*) FROM organization_memberships
+                 WHERE organization_id = :org AND status = 'ACTIVE' AND role = 'AGENT') AS agents
             """.trimIndent(),
             MapSqlParameterSource().addValue("org", principal.organizationId),
             RowMapper { rs, _ ->
@@ -91,6 +102,10 @@ class DashboardAnalyticsService(
                     rs.getLong("upcoming_visits"),
                     rs.getLong("open_tasks"),
                     rs.getLong("active_members"),
+                    rs.getLong("leads"),
+                    rs.getLong("owners"),
+                    rs.getLong("customers"),
+                    rs.getLong("agents"),
                 )
             },
         ).single()
