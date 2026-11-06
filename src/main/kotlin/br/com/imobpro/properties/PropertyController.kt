@@ -26,7 +26,7 @@ import java.util.UUID
 @RequestMapping("/api/v1/properties")
 class PropertyController(private val propertyService: PropertyService) {
     @GetMapping
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     fun list(
         authentication: Authentication,
         @RequestParam(defaultValue = "0") @Min(0) offset: Int,
@@ -36,14 +36,14 @@ class PropertyController(private val propertyService: PropertyService) {
     ): PropertyPage = propertyService.list(authentication.tenantPrincipal(), offset, limit, city, status)
 
     @GetMapping("/{propertyId}")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     fun get(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
     ): PropertyResponse = propertyService.get(authentication.tenantPrincipal(), propertyId)
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
         authentication: Authentication,
@@ -51,7 +51,7 @@ class PropertyController(private val propertyService: PropertyService) {
     ): PropertyResponse = propertyService.create(authentication.tenantPrincipal(), request)
 
     @PutMapping("/{propertyId}")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     fun update(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
@@ -59,7 +59,7 @@ class PropertyController(private val propertyService: PropertyService) {
     ): PropertyResponse = propertyService.update(authentication.tenantPrincipal(), propertyId, request)
 
     @org.springframework.web.bind.annotation.PatchMapping("/{propertyId}")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT', 'PROPERTY_OWNER')")
     fun patch(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
@@ -67,7 +67,7 @@ class PropertyController(private val propertyService: PropertyService) {
     ): PropertyResponse = propertyService.update(authentication.tenantPrincipal(), propertyId, request)
 
     @DeleteMapping("/{propertyId}")
-    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'PROPERTY_OWNER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun archive(authentication: Authentication, @PathVariable propertyId: UUID) {
         propertyService.archive(authentication.tenantPrincipal(), propertyId)
