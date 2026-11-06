@@ -64,9 +64,9 @@ private data class EnabledAutomation(
 class AutomationEventWorker(
     private val jdbc: NamedParameterJdbcTemplate,
     private val objectMapper: ObjectMapper,
-    @Value("${imobpro.automations.enabled:true}") private val enabled: Boolean,
+    @Value("\${imobpro.automations.enabled:true}") private val enabled: Boolean,
 ) {
-    @Scheduled(fixedDelayString = "${imobpro.automations.poll-interval-ms:5000}")
+    @Scheduled(fixedDelayString = "\${imobpro.automations.poll-interval-ms:5000}")
     @Transactional
     fun dispatch() {
         if (!enabled) return
