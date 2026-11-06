@@ -125,6 +125,34 @@ function sendApiResult(res, result) {
   return res.json(toSnake(result.data));
 }
 
+
+app.get("/api/settings", async (_req, res) => {
+  const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
+  if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
+  try { return sendApiResult(res, await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/settings")); }
+  catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
+});
+
+app.get("/api/properties", async (req, res) => {
+  const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
+  if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
+  try {
+    const query = new URLSearchParams(req.query);
+    return sendApiResult(res, await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/listings" + (query.size ? "?" + query.toString() : "")));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
+});
+
+app.post("/api/leads", authLimiter, requireCsrf, async (req, res) => {
+  const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
+  if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
+  try {
+    const result = await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/leads", {
+      method: "POST", body: toCamel(req.body || {}),
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "API Kotlin indisponível."); }
+});
+
 app.post("/api/auth/organizations", authLimiter, requireCsrf, async (req, res) => {
   try {
     const result = await apiCall("/api/v1/auth/organizations", {
@@ -138,6 +166,14 @@ app.post("/api/auth/organizations", authLimiter, requireCsrf, async (req, res) =
 app.post("/api/auth/login", authLimiter, requireCsrf, async (req, res) => {
   try {
     const credentials = toCamel(req.body || {});
+    if (!credentials.organizationId) {
+      const choices = await apiCall("/api/v1/auth/organizations", { method: "POST", body: credentials });
+      if (choices.status !== 200) return sendApiResult(res, choices);
+      if (!Array.isArray(choices.data) || choices.data.length !== 1) {
+        return res.status(409).json({ error: "organization_selection_required", organizations: toSnake(choices.data || []) });
+      }
+      credentials.organizationId = choices.data[0].organizationId;
+    }
     const result = await apiCall("/api/v1/auth/login", { method: "POST", body: credentials });
     if (result.status !== 200) return sendApiResult(res, result);
     await new Promise((resolve, reject) => req.session.regenerate(error => error ? reject(error) : resolve()));
@@ -205,6 +241,26 @@ app.get("/healthz", async (_req, res) => {
     await pool.query("SELECT 1");
     res.json({ status: "ok" });
   } catch { res.status(503).json({ status: "unavailable" }); }
+});
+
+
+app.use(async (req, res) => {
+  if (!process.env.LEGACY_WEB_URL || !["GET", "HEAD"].includes(req.method)) {
+    return fail(res, 404, "NOT_FOUND", "Rota não encontrada.");
+  }
+  try {
+    const upstreamUrl = new URL(req.originalUrl, process.env.LEGACY_WEB_URL);
+    const allowedOrigin = new URL(process.env.LEGACY_WEB_URL).origin;
+    if (upstreamUrl.origin !== allowedOrigin) return fail(res, 400, "INVALID_UPSTREAM", "Destino inválido.");
+    const upstream = await fetch(upstreamUrl, { method: req.method, redirect: "manual", signal: AbortSignal.timeout(10000) });
+    res.status(upstream.status);
+    for (const header of ["content-type", "cache-control", "etag", "last-modified"]) {
+      const value = upstream.headers.get(header);
+      if (value) res.set(header, value);
+    }
+    if (req.method === "HEAD") return res.end();
+    return res.send(Buffer.from(await upstream.arrayBuffer()));
+  } catch { return fail(res, 502, "LEGACY_WEB_UNAVAILABLE", "A interface web legada está indisponível."); }
 });
 
 app.use((error, _req, res, _next) => {
