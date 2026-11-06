@@ -66,3 +66,17 @@ Não descarte linhas órfãs silenciosamente. Gere um CSV/JSON de quarentena com
 
 ## Bloqueio conhecido
 O importador PostgreSQL ainda não foi ativado. É intencional não inventar conversões para campos e permissões que precisam de validação de negócio. A exportação auditável é a primeira etapa segura; o carregamento depende de mapear as migrations de destino, validar os campos legados completos e definir a política de papéis da organização de migração.
+
+
+### Windows PowerShell
+
+No Windows, execute na pasta do repositório:
+
+```powershell
+py -3 .\scripts\legacy-migration\export_sqlite.py `
+  --database "C:\Projetos\Imob-Pro\imobpro.sqlite" `
+  --uploads "C:\Projetos\Imob-Pro\uploads" `
+  --output "D:\Backups\imob-pro-export"
+```
+
+Ajuste os caminhos para o local real do arquivo SQLite e da pasta de imagens. Feche o servidor legado antes de fazer a cópia de origem ou use uma cópia consistente com seus arquivos WAL. Não envie o export para o GitHub: ele contém dados pessoais e hashes de senha.
