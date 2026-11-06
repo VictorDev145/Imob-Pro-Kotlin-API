@@ -395,6 +395,318 @@ app.post("/api/messages", requireCsrf, async (req, res) => {
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível enviar a mensagem."); }
 });
 
+
+function legacyStatus(value) {
+  return String(value || "").toLowerCase();
+}
+function legacyLead(item) {
+  return {
+    id: item.id,
+    name: item.fullName,
+    email: item.email,
+    whatsapp: item.phone,
+    status: legacyStatus(item.status),
+    message: item.message,
+    property_id: item.propertyId,
+    assigned_to: item.assignedToUserId,
+    created_at: item.createdAt,
+  };
+}
+function legacyTask(item) {
+  return {
+    id: item.id,
+    title: item.title,
+    notes: item.description,
+    status: legacyStatus(item.status),
+    priority: legacyStatus(item.priority),
+    due_at: item.dueAt,
+    user_id: item.assignedToUserId,
+    lead_id: item.leadId,
+    property_id: item.propertyId,
+    lead_name: null,
+    property_title: null,
+    created_at: item.createdAt,
+  };
+}
+function legacyVisit(item) {
+  return {
+    id: item.id,
+    property_id: item.propertyId,
+    lead_id: item.leadId,
+    agent_id: item.assignedToUserId,
+    visit_date: item.scheduledAt,
+    status: legacyStatus(item.status),
+    notes: item.notes,
+    created_at: item.createdAt,
+  };
+}
+function legacyPropertyFromPrivate(item, images = [], listingStatus = null) {
+  const purpose = item.purpose === "RENT" ? "aluguel" : "venda";
+  const mappedImages = images.map(image => ({
+    id: image.id,
+    filename: "/media/property/" + encodeURIComponent(item.id) + "/" + encodeURIComponent(image.id),
+    alt_text: image.altText || "",
+    position: image.position,
+  }));
+  return {
+    id: item.id,
+    title: item.title,
+    description: item.description || "",
+    type: ({ APARTMENT: "Apartamento", HOUSE: "Casa", COMMERCIAL: "Comercial", LAND: "Terreno", RURAL: "Rural" })[item.propertyType] || "Outro",
+    purpose,
+    status: legacyStatus(listingStatus || item.status),
+    city: item.city,
+    state: item.state,
+    neighborhood: item.neighborhood || "",
+    address: [item.street, item.streetNumber, item.complement].filter(Boolean).join(" "),
+    bedrooms: item.bedrooms || 0,
+    suites: 0,
+    bathrooms: item.bathrooms || 0,
+    parking: item.parkingSpaces || 0,
+    area: Number(item.builtArea || item.landArea || 0),
+    price: Number(item.rentPrice || item.salePrice || 0),
+    condo: 0,
+    iptu: 0,
+    cover_image: mappedImages[0]?.filename || "",
+    images: mappedImages,
+    features: [],
+    owner_name: "Equipe",
+  };
+}
+async function loadLegacyProperties(req) {
+  const [properties, listings] = await Promise.all([
+    authenticatedCall(req, "/api/v1/properties?offset=0&limit=100"),
+    authenticatedCall(req, "/api/v1/listings?offset=0&limit=100"),
+  ]);
+  if (properties.status !== 200) return properties;
+  const listingStatus = new Map((listings.data || []).map(item => [item.propertyId, item.status]));
+  const items = properties.data?.items || [];
+  const mapped = await Promise.all(items.map(async item => {
+    const imageResult = await authenticatedCall(req, "/api/v1/properties/" + encodeURIComponent(item.id) + "/images");
+    return legacyPropertyFromPrivate(item, imageResult.status === 200 ? imageResult.data || [] : [], listingStatus.get(item.id));
+  }));
+  return { status: 200, data: mapped };
+}
+
+app.get("/api/admin/stats", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/dashboard/summary");
+    if (result.status !== 200) return sendApiResult(res, result);
+    const value = result.data;
+    return res.json({
+      properties: value.properties,
+      newLeads: value.newLeads,
+      visits: value.upcomingVisits,
+      customers: value.activeMembers,
+      published: value.publishedListings,
+    });
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Dashboard indisponível."); }
+});
+
+app.get("/api/agent/summary", async (req, res) => {
+  try {
+    const [leads, tasks, unread] = await Promise.all([
+      authenticatedCall(req, "/api/v1/leads?assignedToMe=true&limit=100"),
+      authenticatedCall(req, "/api/v1/crm/tasks?assignedToMe=true&limit=100"),
+      authenticatedCall(req, "/api/v1/conversations/unread"),
+    ]);
+    if ([leads, tasks, unread].some(result => result.status !== 200)) return sendApiResult(res, [leads, tasks, unread].find(result => result.status !== 200));
+    const leadItems = leads.data?.items || [];
+    const taskItems = tasks.data?.items || [];
+    return res.json({
+      leads: leadItems.length,
+      openLeads: leadItems.filter(item => !["CLOSED", "CONVERTED", "LOST"].includes(item.status)).length,
+      tasks: taskItems.filter(item => ["OPEN", "IN_PROGRESS"].includes(item.status)).length,
+      unread: unread.data?.count || 0,
+    });
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Dashboard do agente indisponível."); }
+});
+
+for (const endpoint of ["/api/admin/leads", "/api/agent/leads"]) {
+  app.get(endpoint, async (req, res) => {
+    try {
+      const assigned = endpoint.includes("/agent/");
+      const result = await authenticatedCall(req, "/api/v1/leads?limit=100" + (assigned ? "&assignedToMe=true" : ""));
+      if (result.status !== 200) return sendApiResult(res, result);
+      return res.json((result.data?.items || []).map(legacyLead));
+    } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Leads indisponíveis."); }
+  });
+}
+
+for (const endpoint of ["/api/admin/tasks", "/api/agent/tasks"]) {
+  app.get(endpoint, async (req, res) => {
+    try {
+      const assigned = endpoint.includes("/agent/");
+      const result = await authenticatedCall(req, "/api/v1/crm/tasks?limit=100" + (assigned ? "&assignedToMe=true" : ""));
+      if (result.status !== 200) return sendApiResult(res, result);
+      return res.json((result.data?.items || []).map(legacyTask));
+    } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Tarefas indisponíveis."); }
+  });
+}
+
+app.get("/api/admin/visits", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/crm/visits?limit=100");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.json((result.data?.items || []).map(legacyVisit));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Visitas indisponíveis."); }
+});
+
+for (const endpoint of ["/api/admin/properties", "/api/owner/properties"]) {
+  app.get(endpoint, async (req, res) => {
+    try {
+      const result = await loadLegacyProperties(req);
+      return result.status === 200 ? res.json(result.data) : sendApiResult(res, result);
+    } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Imóveis indisponíveis."); }
+  });
+}
+
+app.post("/api/admin/properties", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const purpose = String(body.purpose || "venda").toLowerCase() === "aluguel" ? "RENT" : "SALE";
+    const type = ({ apartamento: "APARTMENT", casa: "HOUSE", comercial: "COMMERCIAL", terreno: "LAND", rural: "RURAL" })[String(body.type || "").toLowerCase()] || "OTHER";
+    const result = await authenticatedCall(req, "/api/v1/properties", {
+      method: "POST",
+      body: {
+        propertyType: type, purpose, title: body.title, description: body.description,
+        city: body.city, state: body.state || "CE", neighborhood: body.neighborhood,
+        street: body.address, bedrooms: Number(body.bedrooms) || null,
+        bathrooms: Number(body.bathrooms) || null, parkingSpaces: Number(body.parking) || null,
+        builtArea: Number(body.area) || null,
+        salePrice: purpose === "SALE" ? Number(body.price) || null : null,
+        rentPrice: purpose === "RENT" ? Number(body.price) || null : null,
+      },
+    });
+    if (result.status !== 201) return sendApiResult(res, result);
+    return res.status(201).json(legacyPropertyFromPrivate(result.data));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível cadastrar o imóvel."); }
+});
+
+app.post("/api/owner/properties", requireCsrf, async (req, res) => {
+  req.url = "/api/admin/properties";
+  return res.redirect(307, "/api/admin/properties");
+});
+
+for (const endpoint of ["/api/admin/properties/:id", "/api/owner/properties/:id"]) {
+  app.patch(endpoint, requireCsrf, async (req, res) => {
+    try {
+      const body = req.body || {};
+      const purpose = String(body.purpose || "venda").toLowerCase() === "aluguel" ? "RENT" : "SALE";
+      const type = ({ apartamento: "APARTMENT", casa: "HOUSE", comercial: "COMMERCIAL", terreno: "LAND", rural: "RURAL" })[String(body.type || "").toLowerCase()] || "OTHER";
+      const result = await authenticatedCall(req, "/api/v1/properties/" + encodeURIComponent(req.params.id), {
+        method: "PATCH",
+        body: {
+          propertyType: type, purpose, title: body.title, description: body.description,
+          city: body.city, state: body.state || "CE", neighborhood: body.neighborhood,
+          street: body.address, bedrooms: Number(body.bedrooms) || null,
+          bathrooms: Number(body.bathrooms) || null, parkingSpaces: Number(body.parking) || null,
+          builtArea: Number(body.area) || null,
+          salePrice: purpose === "SALE" ? Number(body.price) || null : null,
+          rentPrice: purpose === "RENT" ? Number(body.price) || null : null,
+        },
+      });
+      if (result.status !== 200) return sendApiResult(res, result);
+      return res.json(legacyPropertyFromPrivate(result.data));
+    } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível atualizar o imóvel."); }
+  });
+}
+
+app.patch("/api/admin/properties/:id/status", requireCsrf, async (req, res) => {
+  try {
+    const status = String(req.body?.status || "").toUpperCase();
+    const result = await authenticatedCall(req, "/api/v1/listings/by-property/" + encodeURIComponent(req.params.id) + "/status", {
+      method: "PATCH", body: { status },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível atualizar o anúncio."); }
+});
+
+app.post("/api/properties/:id/view", requireCsrf, async (req, res) => {
+  const slug = process.env.PUBLIC_ORGANIZATION_SLUG;
+  if (!slug) return fail(res, 503, "PUBLIC_ORGANIZATION_NOT_CONFIGURED", "Configure PUBLIC_ORGANIZATION_SLUG.");
+  try {
+    const result = await apiCall("/api/v1/public/" + encodeURIComponent(slug) + "/properties/" +
+      encodeURIComponent(req.params.id) + "/view", {
+      method: "POST", body: { source: "DIRECT" },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível registrar a visualização."); }
+});
+
+app.post("/api/visits", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const result = await authenticatedCall(req, "/api/v1/crm/visits", {
+      method: "POST",
+      body: {
+        propertyId: body.property_id || body.propertyId,
+        scheduledAt: body.visit_date || body.scheduledAt,
+        notes: body.notes || null,
+      },
+    });
+    if (result.status !== 201) return sendApiResult(res, result);
+    return res.status(201).json(legacyVisit(result.data));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível solicitar a visita."); }
+});
+
+app.post("/api/admin/tasks", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const result = await authenticatedCall(req, "/api/v1/crm/tasks", {
+      method: "POST",
+      body: {
+        title: body.title, description: body.notes || body.description || null,
+        assignedToUserId: body.user_id || body.assigned_to || null,
+        leadId: body.lead_id || null, propertyId: body.property_id || null,
+        dueAt: body.due_at || null, priority: String(body.priority || "normal").toUpperCase(),
+      },
+    });
+    if (result.status !== 201) return sendApiResult(res, result);
+    return res.status(201).json(legacyTask(result.data));
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível criar a tarefa."); }
+});
+
+for (const pattern of ["/api/admin/tasks/:id", "/api/agent/tasks/:id"]) {
+  app.patch(pattern, requireCsrf, async (req, res) => {
+    try {
+      const status = String(req.body?.status || "done").toUpperCase();
+      const result = await authenticatedCall(req, "/api/v1/crm/tasks/" + encodeURIComponent(req.params.id) + "/status", {
+        method: "PATCH", body: { status: status === "DONE" ? "DONE" : status === "OPEN" ? "OPEN" : "IN_PROGRESS" },
+      });
+      return sendApiResult(res, result);
+    } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível atualizar a tarefa."); }
+  });
+}
+
+app.patch("/api/admin/leads/:id", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    let result;
+    if (body.assigned_to || body.assignedToUserId) {
+      result = await authenticatedCall(req, "/api/v1/leads/" + encodeURIComponent(req.params.id) + "/assignment", {
+        method: "PATCH", body: { assignedToUserId: body.assigned_to || body.assignedToUserId },
+      });
+    } else {
+      const status = String(body.status || "contacted").toUpperCase();
+      const mapped = ({ VISIT: "QUALIFIED", PROPOSAL: "QUALIFIED", NEGOTIATION: "QUALIFIED", CLOSED: "CONVERTED" })[status] || status;
+      result = await authenticatedCall(req, "/api/v1/leads/" + encodeURIComponent(req.params.id) + "/status", {
+        method: "PATCH", body: { status: mapped },
+      });
+    }
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível atualizar o lead."); }
+});
+
+app.get("/media/property/:propertyId/:imageId", async (req, res) => {
+  try {
+    const result = await authenticatedCall(req, "/api/v1/properties/" + encodeURIComponent(req.params.propertyId) +
+      "/images/" + encodeURIComponent(req.params.imageId) + "/content");
+    if (result.status !== 200) return sendApiResult(res, result);
+    return res.send(result.data);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Imagem indisponível."); }
+});
+
 app.use("/api", async (req, res, next) => {
   if (req.path === "/csrf" || req.path.startsWith("/auth/")) return next();
   if (mutationMethods.has(req.method)) {
