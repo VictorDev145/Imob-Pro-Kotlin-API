@@ -9,7 +9,7 @@ O serviço `compat-bff` é um gateway same-origin separado da API Kotlin:
 - Token CSRF double-submit para POST/PATCH/DELETE; `public/app.js` busca `/api/csrf` e envia `X-CSRF-Token` em mutações.
 - Rotação de refresh token no servidor após 401, logout/revogação e rate limit de login/cadastro.
 - Proxy de arquivos estáticos para o Express legado, sem encaminhar rotas `/api` desconhecidas para o backend antigo.
-- Conversão camelCase/snake_case e adapters de autenticação, cadastro de cliente no tenant público, propriedades públicas, leads, visitas, tarefas, CRM, mensagens, favoritos, notificações, coleções, buscas salvas, membros, automações e privacidade.
+- Conversão camelCase/snake_case e adapters de autenticação, cadastro de cliente no tenant público, propriedades públicas, leads, visitas, tarefas, CRM, mensagens, favoritos, notificações, coleções, buscas salvas, membros, automações e privacidade. O BFF também serve as páginas de aceite de convite e redefinição de senha no mesmo domínio.
 - Contatos de chat limitados a membros operacionais do tenant; conversas validam participantes ativos na organização. IDs numéricos do chat legado são traduzidos por aliases persistentes para UUIDs.
 - Upload multipart encaminhado à API Kotlin, que aceita os campos `files` e `images[]`.
 
