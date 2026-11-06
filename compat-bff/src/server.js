@@ -118,6 +118,10 @@ async function authenticatedCall(req, path, options = {}) {
 }
 
 function sendApiResult(res, result) {
+  if (result.status >= 400 && result.data && typeof result.data === "object") {
+    const message = result.data.detail || result.data.message || result.data.error || "A operação não foi concluída.";
+    return res.status(result.status).json({ error: typeof message === "string" ? message : JSON.stringify(message) });
+  }
   res.status(result.status);
   if (result.headers?.get("content-type")) res.set("content-type", result.headers.get("content-type"));
   if (result.data === null || result.data === undefined) return res.end();
@@ -245,6 +249,7 @@ app.get("/healthz", async (_req, res) => {
 
 
 app.use(async (req, res) => {
+  if (req.path.startsWith("/api")) return fail(res, 501, "LEGACY_ROUTE_NOT_MAPPED", "Endpoint legado ainda sem adaptador validado.");
   if (!process.env.LEGACY_WEB_URL || !["GET", "HEAD"].includes(req.method)) {
     return fail(res, 404, "NOT_FOUND", "Rota não encontrada.");
   }
