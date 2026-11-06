@@ -13,6 +13,22 @@ import org.springframework.web.server.ResponseStatusException
 class LeadService(private val jdbc: NamedParameterJdbcTemplate) {
     @Transactional
     fun create(principal: TenantPrincipal, request: CreateLeadRequest): LeadResponse {
+        if (request.propertyId != null) {
+            val propertyBelongsToTenant = jdbc.query(
+                """
+                SELECT 1 FROM properties
+                WHERE id = :propertyId
+                  AND organization_id = :organizationId
+                  AND archived_at IS NULL
+                """.trimIndent(),
+                MapSqlParameterSource()
+                    .addValue("propertyId", request.propertyId)
+                    .addValue("organizationId", principal.organizationId),
+            ) { rs, _ -> rs.getInt(1) }.isNotEmpty()
+            if (!propertyBelongsToTenant) {
+                throw ResponseStatusException(HttpStatus.NOT_FOUND, "Property not found")
+            }
+        }
         val id = UUID.randomUUID()
         jdbc.update(
             """
