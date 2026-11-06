@@ -10,7 +10,7 @@ O serviço `compat-bff` é um gateway same-origin separado da API Kotlin:
 - Rotação de refresh token no servidor após 401, logout/revogação e rate limit de login/cadastro.
 - Proxy de arquivos estáticos para o Express legado, sem encaminhar rotas `/api` desconhecidas para o backend antigo.
 - Conversão camelCase/snake_case e adapters de autenticação, cadastro de cliente no tenant público, propriedades públicas, leads, visitas, tarefas, CRM, mensagens, favoritos, notificações, coleções, buscas salvas, membros, automações e privacidade.
-- Contatos de chat limitados a membros operacionais do tenant; conversas validam participantes ativos na organização.
+- Contatos de chat limitados a membros operacionais do tenant; conversas validam participantes ativos na organização. IDs numéricos do chat legado são traduzidos por aliases persistentes para UUIDs.
 - Upload multipart encaminhado à API Kotlin, que aceita os campos `files` e `images[]`.
 
 ## Inicialização local
@@ -29,9 +29,9 @@ Não use o segredo padrão do Compose em produção. Defina TLS no proxy reverso
 A matriz original contém 67 declarações Express. O registro BFF tem 52 mapeamentos explícitos e handlers especializados adicionais, mas isso **não significa 67 contratos aceitos**. Rotas sem adapter respondem 501 deliberadamente; não há fallback silencioso para o Express antigo.
 
 Bloqueios restantes:
-- IDs SQLite numéricos ainda não foram migrados para UUIDs de domínio. A interface atual foi ajustada para aceitar UUIDs nos fluxos principais, mas dados históricos ainda dependem de importação/mapeamento de domínio.
+- IDs históricos do SQLite ainda dependem de importação e reconciliação para UUIDs de domínio. O alias numérico persistente cobre somente os IDs de contatos do chat legado, não substitui o mapeamento de IDs de imóveis, usuários e demais tabelas.
 - A criação/edição de imóveis precisa de ensaio real com formulários, fotos, papéis OWNER/ADMIN e payloads legados completos.
-- O cadastro de proprietário/anunciante e gestão de membros precisa de fluxo de convite e validação de papel; não se deve elevar automaticamente um cliente a administrador.
+- O cadastro de membros usa convite por e-mail com página própria de aceite (`/accept-invitation`). O papel legado `owner` é mapeado para `PROPERTY_OWNER`, separado do `OWNER` que representa o proprietário da organização. O acesso de `PROPERTY_OWNER` a imóveis e imagens é limitado aos registros criados por esse usuário; a importação histórica precisa preservar essa relação.
 - Estados do pipeline legado `visit` e `proposal` são projetados para `QUALIFIED`/workflow atual onde a API ainda não tem equivalência completa.
 - Coleções e favoritos precisam de testes visuais de detalhes/imagens; conversas precisam de ensaio com dois usuários reais.
 - Endpoints legados não usados pela interface principal (admin messages, analytics, privacy, automations, settings) ainda precisam de testes de contrato individuais.
