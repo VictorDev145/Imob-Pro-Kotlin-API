@@ -90,3 +90,12 @@ test("chat compatibility maps numeric contact IDs to stable UUID aliases", () =>
   assert.ok(server.includes("const recipientId = await userIdForLegacyId(legacyRecipientId)"));
   assert.ok(server.includes("legacy_user_id_map"));
 });
+
+
+test("chat compatibility marks incoming messages as read, not outgoing messages", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(
+    server,
+    /read_at: message\.senderUserId === recipientId \? message\.createdAt : null/,
+  );
+});
