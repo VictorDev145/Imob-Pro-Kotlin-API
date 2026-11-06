@@ -35,6 +35,7 @@ data class PublicLeadRequest(
     @field:Email @field:Size(max = 254) val email: String? = null,
     @field:Size(max = 10000) val message: String? = null,
     val listingSlug: String? = null,
+    val propertyId: UUID? = null,
 )
 
 data class PublicImage(
@@ -47,6 +48,7 @@ data class PublicImage(
 
 data class PublicListing(
     val id: UUID,
+    val propertyId: UUID,
     val slug: String,
     val title: String,
     val description: String?,
@@ -100,7 +102,7 @@ class PublicPortalService(
         val extra = filters.joinToString(" AND ", if (filters.isEmpty()) "" else " AND ")
         val rows = jdbc.query(
             """
-            SELECT l.id, l.public_slug, l.title, l.description,
+            SELECT l.id, p.id AS property_id, l.public_slug, l.title, l.description,
                    p.property_type, p.purpose, p.city, p.state, p.neighborhood,
                    p.bedrooms, p.bathrooms, p.parking_spaces, p.built_area, p.land_area,
                    p.sale_price, p.rent_price, l.published_at
@@ -120,7 +122,7 @@ class PublicPortalService(
         return PublicListingPage(rows.map { it.copy(images = images(organizationSlug, it.id)) }, offset, limit)
     }
 
-    fun getById(organizationSlug: String, listingId: UUID): PublicListing {
+    fun getByPropertyId(organizationSlug: String, propertyId: UUID): PublicListing {
         validateOrganization(organizationSlug)
         val row = jdbc.query(
             """
@@ -131,11 +133,11 @@ class PublicPortalService(
             FROM listings l
             JOIN properties p ON p.id = l.property_id AND p.organization_id = l.organization_id
             JOIN organizations o ON o.id = l.organization_id
-            WHERE o.slug = :org AND l.id = :id AND o.status = 'ACTIVE'
+            WHERE o.slug = :org AND l.property_id = :property AND o.status = 'ACTIVE'
               AND l.status = 'PUBLISHED' AND l.channel = 'WEBSITE'
               AND p.status = 'ACTIVE' AND p.archived_at IS NULL
             """.trimIndent(),
-            MapSqlParameterSource().addValue("org", organizationSlug).addValue("id", listingId),
+            MapSqlParameterSource().addValue("org", organizationSlug).addValue("property", propertyId),
             listingMapper,
         ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
         return row.copy(images = images(organizationSlug, row.id))
@@ -198,14 +200,18 @@ class PublicPortalService(
             JOIN organization_memberships m
               ON m.organization_id = o.id AND m.role = 'OWNER' AND m.status = 'ACTIVE'
             LEFT JOIN listings l
-              ON l.organization_id = o.id AND l.public_slug = :listingSlug
+              ON l.organization_id = o.id
+             AND (
+                 (:listingSlug IS NOT NULL AND l.public_slug = :listingSlug)
+                 OR (:propertyId IS NOT NULL AND l.property_id = :propertyId)
+             )
              AND l.status = 'PUBLISHED' AND l.channel = 'WEBSITE'
             WHERE o.slug = :orgSlug AND o.status = 'ACTIVE'
             ORDER BY m.created_at
             LIMIT 1
             """.trimIndent(),
             MapSqlParameterSource().addValue("listingSlug", request.listingSlug)
-                .addValue("orgSlug", organizationSlug),
+                .addValue("propertyId", request.propertyId).addValue("orgSlug", organizationSlug),
             RowMapper { rs, _ ->
                 Triple(
                     rs.getObject("organization_id", UUID::class.java),
@@ -214,7 +220,7 @@ class PublicPortalService(
                 )
             },
         ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        if (request.listingSlug != null && context.third == null) {
+        if ((request.listingSlug != null || request.propertyId != null) && context.third == null) {
             throw ResponseStatusException(HttpStatus.NOT_FOUND, "Published listing not found")
         }
         val leadId = UUID.randomUUID()
@@ -299,6 +305,7 @@ class PublicPortalService(
     private val listingMapper = RowMapper<PublicListing> { rs, _ ->
         PublicListing(
             rs.getObject("id", UUID::class.java),
+            rs.getObject("property_id", UUID::class.java),
             rs.getString("public_slug"),
             rs.getString("title"),
             rs.getString("description"),
@@ -338,11 +345,11 @@ class PublicPortalController(private val service: PublicPortalService) {
         return service.list(organizationSlug, offset, limit, purpose, city)
     }
 
-    @GetMapping("/listings/by-id/{listingId}")
-    fun getById(
+    @GetMapping("/listings/by-property/{propertyId}")
+    fun getByProperty(
         @PathVariable organizationSlug: String,
-        @PathVariable listingId: UUID,
-    ): PublicListing = service.getById(organizationSlug, listingId)
+        @PathVariable propertyId: UUID,
+    ): PublicListing = service.getByPropertyId(organizationSlug, propertyId)
 
     @GetMapping("/listings/{listingSlug}")
     fun get(
