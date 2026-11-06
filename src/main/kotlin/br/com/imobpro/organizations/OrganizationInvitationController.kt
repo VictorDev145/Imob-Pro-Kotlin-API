@@ -56,8 +56,8 @@ class OrganizationInvitationService(
     private val jdbc: JdbcTemplate,
     private val mailSender: JavaMailSender,
     private val passwordEncoder: PasswordEncoder,
-    @Value("${app.public-base-url:http://localhost:3000}") private val publicBaseUrl: String,
-    @Value("${spring.mail.username:}") private val mailUsername: String,
+    @Value("\${app.public-base-url:http://localhost:3000}") private val publicBaseUrl: String,
+    @Value("\${spring.mail.username:}") private val mailUsername: String,
 ) {
     private val random = SecureRandom()
 
