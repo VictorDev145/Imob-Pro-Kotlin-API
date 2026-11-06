@@ -90,6 +90,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      legacy-web:
+        condition: service_healthy
     environment:
       NODE_ENV: ${NODE_ENV:-development}
       PORT: 3100
