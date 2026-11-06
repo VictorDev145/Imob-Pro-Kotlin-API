@@ -49,7 +49,6 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
             .addValue("offset", offset)
             .addValue("limit", limit)
             .addValue("createdBy", principal.userId)
-        .addValue("ownerScope", principal.role == "PROPERTY_OWNER")
         val filters = mutableListOf<String>()
         if (principal.role == "PROPERTY_OWNER") filters.add("created_by = :createdBy")
         if (!city.isNullOrBlank()) {
@@ -154,6 +153,7 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
     ): MapSqlParameterSource = MapSqlParameterSource()
         .addValue("organizationId", principal.organizationId)
         .addValue("createdBy", principal.userId)
+        .addValue("ownerScope", principal.role == "PROPERTY_OWNER")
         .addValue("propertyType", request.propertyType)
         .addValue("purpose", request.purpose)
         .addValue("title", request.title.trim())
