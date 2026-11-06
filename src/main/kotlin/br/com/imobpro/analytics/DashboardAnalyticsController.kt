@@ -169,11 +169,11 @@ class PublicViewService(private val jdbc: NamedParameterJdbcTemplate) {
               AND l.public_slug = :listingSlug AND l.status = 'PUBLISHED'
               AND l.channel = 'WEBSITE' AND p.status = 'ACTIVE' AND p.archived_at IS NULL
               AND (
-                :sessionHash IS NULL OR NOT EXISTS (
+                CAST(:sessionHash AS CHAR(64)) IS NULL OR NOT EXISTS (
                     SELECT 1 FROM property_views pv
                     WHERE pv.organization_id = l.organization_id
                       AND pv.property_id = l.property_id
-                      AND pv.session_hash = :sessionHash
+                      AND pv.session_hash = CAST(:sessionHash AS CHAR(64))
                       AND pv.created_at >= CURRENT_DATE
                 )
               )
