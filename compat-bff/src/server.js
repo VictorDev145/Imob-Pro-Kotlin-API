@@ -421,7 +421,7 @@ app.get("/api/messages", async (req, res) => {
       recipient_id: recipientId,
       body: message.body,
       created_at: message.createdAt,
-      read_at: message.senderUserId === recipientId ? null : message.createdAt,
+      read_at: message.senderUserId === recipientId ? message.createdAt : null,
     })));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Chat indisponível."); }
 });
