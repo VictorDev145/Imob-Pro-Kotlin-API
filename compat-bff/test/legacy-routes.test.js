@@ -171,3 +171,12 @@ test("every enabled legacy contract has a concrete adapter or route mapping", ()
     }
   }
 });
+
+
+test("password reset emails have a first-party page and CSRF-protected form", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(server, /app\.get\("\/reset-password"/);
+  assert.match(server, /const resetPasswordPage = `<!doctype html>/);
+  assert.match(server, /fetch\("\/api\/auth\/reset-password"/);
+  assert.match(server, /minlength="12"/);
+});
