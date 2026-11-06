@@ -242,6 +242,70 @@ class AuthFlowIntegrationTest {
             )
         assertEquals(HttpStatus.NOT_FOUND, crossTenantLeadRead.statusCode)
 
+        val crossTenantFavorite =
+            rest.exchange(
+                url("/api/v1/me/favorites/${property.id}"),
+                HttpMethod.POST,
+                HttpEntity<Void>(otherTenantHeaders),
+                String::class.java,
+            )
+        assertEquals(HttpStatus.NOT_FOUND, crossTenantFavorite.statusCode)
+
+        val crossTenantCollectionItem =
+            rest.exchange(
+                url("/api/v1/me/collections/${collection.body!!.id}/items"),
+                HttpMethod.POST,
+                HttpEntity(AddCollectionItemRequest(property.id), otherTenantHeaders),
+                String::class.java,
+            )
+        assertEquals(HttpStatus.NOT_FOUND, crossTenantCollectionItem.statusCode)
+
+        val crossTenantAnalytics =
+            rest.exchange(
+                url("/api/v1/analytics/properties/${property.id}"),
+                HttpMethod.GET,
+                HttpEntity<Void>(otherTenantHeaders),
+                String::class.java,
+            )
+        assertEquals(HttpStatus.NOT_FOUND, crossTenantAnalytics.statusCode)
+
+        val conversation =
+            rest.postForEntity(
+                url("/api/v1/conversations"),
+                HttpEntity(mapOf("subject" to "Conversa privada"), propertyHeaders),
+                Map::class.java,
+            )
+        assertEquals(HttpStatus.CREATED, conversation.statusCode)
+        val conversationId = conversation.body!!["id"]
+        val crossTenantConversation =
+            rest.exchange(
+                url("/api/v1/conversations/$conversationId/messages"),
+                HttpMethod.GET,
+                HttpEntity<Void>(otherTenantHeaders),
+                String::class.java,
+            )
+        assertEquals(HttpStatus.NOT_FOUND, crossTenantConversation.statusCode)
+
+        val crossTenantNotifications =
+            rest.exchange(
+                url("/api/v1/notifications"),
+                HttpMethod.GET,
+                HttpEntity<Void>(otherTenantHeaders),
+                String::class.java,
+            )
+        assertEquals(HttpStatus.OK, crossTenantNotifications.statusCode)
+        assertTrue(!crossTenantNotifications.body.orEmpty().contains("Conversa privada"))
+
+        val crossTenantAutomations =
+            rest.exchange(
+                url("/api/v1/automations"),
+                HttpMethod.GET,
+                HttpEntity<Void>(otherTenantHeaders),
+                String::class.java,
+            )
+        assertEquals(HttpStatus.OK, crossTenantAutomations.statusCode)
+        assertEquals("[]", crossTenantAutomations.body)
+
         val logout =
             rest.exchange(
                 url("/api/v1/auth/logout"),
