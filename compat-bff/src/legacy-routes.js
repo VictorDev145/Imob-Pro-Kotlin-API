@@ -38,6 +38,22 @@ const definitions = [
   ["PATCH", /^\/api\/admin\/leads\/([^/]+)$/, "/api/v1/leads/$1"],
   ["GET", /^\/api\/agent\/leads$/, "/api/v1/leads"],
   ["GET", /^\/api\/agent\/tasks$/, "/api/v1/crm/tasks"],
+  ["POST", /^\/api\/auth\/change-password$/, "/api/v1/me/password"],
+  ["POST", /^\/api\/auth\/forgot-password$/, "/api/v1/auth/password/forgot"],
+  ["POST", /^\/api\/auth\/reset-password$/, "/api/v1/auth/password/reset"],
+  ["GET", /^\/api\/admin\/users$/, "/api/v1/organizations/current/members"],
+  ["POST", /^\/api\/admin\/users$/, "/api/v1/organizations/current/invitations"],
+  ["PATCH", /^\/api\/admin\/users\/([^/]+)$/, "/api/v1/organizations/current/members/$1/role"],
+  ["DELETE", /^\/api\/admin\/users\/([^/]+)$/, "/api/v1/organizations/current/members/$1"],
+  ["GET", /^\/api\/agent\/leads$/, "/api/v1/leads?assignedToMe=true"],
+  ["GET", /^\/api\/agent\/tasks$/, "/api/v1/crm/tasks?assignedToMe=true"],
+  ["PATCH", /^\/api\/agent\/tasks\/([^/]+)$/, "/api/v1/crm/tasks/$1/status"],
+  ["GET", /^\/api\/admin\/messages$/, "/api/v1/conversations/admin/messages"],
+  ["GET", /^\/api\/owner\/properties$/, "/api/v1/properties"],
+  ["POST", /^\/api\/owner\/properties$/, "/api/v1/properties"],
+  ["PATCH", /^\/api\/owner\/properties\/([^/]+)$/, "/api/v1/properties/$1"],
+  ["POST", /^\/api\/visits$/, "/api/v1/crm/visits"],
+  ["PATCH", /^\/api\/admin\/properties\/([^/]+)\/status$/, "/api/v1/listings/by-property/$1/status"],
 ];
 
 export function matchLegacyRoute(method, pathname) {
