@@ -50,7 +50,7 @@ class SecurityConfig {
             .authorizeHttpRequests {
                 it.requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers(HttpMethod.GET, "/api/v1/public/**").permitAll()
-                    .requestMatchers(HttpMethod.POST, "/api/v1/public/*/leads").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/v1/public/*/leads", "/api/v1/public/*/listings/*/view").permitAll()
                     .requestMatchers(
                         HttpMethod.POST,
                         "/api/v1/auth/register",
