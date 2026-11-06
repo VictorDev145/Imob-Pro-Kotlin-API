@@ -42,6 +42,7 @@ data class DashboardSummary(
 data class ActivityResponse(
     val id: UUID,
     val actorUserId: UUID?,
+    val actorName: String?,
     val action: String,
     val resourceType: String,
     val resourceId: UUID?,
@@ -121,10 +122,12 @@ class DashboardAnalyticsService(
     fun activity(principal: TenantPrincipal, limit: Int): List<ActivityResponse> =
         jdbc.query(
             """
-            SELECT id, actor_user_id, action, resource_type, resource_id, metadata, created_at
-            FROM activity_log
-            WHERE organization_id = :org
-            ORDER BY created_at DESC
+            SELECT a.id, a.actor_user_id, u.full_name AS actor_name, a.action,
+                   a.resource_type, a.resource_id, a.metadata, a.created_at
+            FROM activity_log a
+            LEFT JOIN users u ON u.id = a.actor_user_id
+            WHERE a.organization_id = :org
+            ORDER BY a.created_at DESC
             LIMIT :limit
             """.trimIndent(),
             MapSqlParameterSource().addValue("org", principal.organizationId).addValue("limit", limit),
@@ -132,6 +135,7 @@ class DashboardAnalyticsService(
                 ActivityResponse(
                     rs.getObject("id", UUID::class.java),
                     rs.getObject("actor_user_id", UUID::class.java),
+                    rs.getString("actor_name"),
                     rs.getString("action"),
                     rs.getString("resource_type"),
                     rs.getObject("resource_id", UUID::class.java),
