@@ -48,15 +48,22 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
             .addValue("organizationId", principal.organizationId)
             .addValue("offset", offset)
             .addValue("limit", limit)
-            .addValue("city", city)
-            .addValue("status", status)
+        val filters = mutableListOf<String>()
+        if (!city.isNullOrBlank()) {
+            filters.add("LOWER(city) = LOWER(:city)")
+            parameters.addValue("city", city.trim())
+        }
+        if (!status.isNullOrBlank()) {
+            filters.add("status = :status")
+            parameters.addValue("status", status)
+        }
+        val filterSql = filters.joinToString(separator = " AND ", prefix = if (filters.isEmpty()) "" else " AND ")
         val items = jdbc.query(
             """
             SELECT * FROM properties
             WHERE organization_id = :organizationId
               AND archived_at IS NULL
-              AND (:city IS NULL OR LOWER(city) = LOWER(:city))
-              AND (:status IS NULL OR status = :status)
+              $filterSql
             ORDER BY created_at DESC
             LIMIT :limit OFFSET :offset
             """.trimIndent(),
@@ -172,9 +179,9 @@ class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
             city = rs.getString("city"),
             state = rs.getString("state").trim(),
             postalCode = rs.getString("postal_code"),
-            bedrooms = rs.getObject("bedrooms") as Int?,
-            bathrooms = rs.getObject("bathrooms") as Int?,
-            parkingSpaces = rs.getObject("parking_spaces") as Int?,
+            bedrooms = (rs.getObject("bedrooms") as? Number)?.toInt(),
+            bathrooms = (rs.getObject("bathrooms") as? Number)?.toInt(),
+            parkingSpaces = (rs.getObject("parking_spaces") as? Number)?.toInt(),
             builtArea = rs.getBigDecimal("built_area"),
             landArea = rs.getBigDecimal("land_area"),
             salePrice = rs.getBigDecimal("sale_price"),
