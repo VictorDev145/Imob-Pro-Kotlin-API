@@ -117,6 +117,16 @@ class ListingService(
         )
         if (changed == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND)
         if (status == "PUBLISHED") {
+            jdbc.update(
+                """
+                UPDATE properties p SET status = 'ACTIVE', updated_at = NOW()
+                FROM listings l
+                WHERE l.id = :id AND l.organization_id = :org
+                  AND p.id = l.property_id AND p.organization_id = l.organization_id
+                  AND p.archived_at IS NULL
+                """.trimIndent(),
+                MapSqlParameterSource().addValue("id", id).addValue("org", principal.organizationId),
+            )
             val propertyId = jdbc.query(
                 "SELECT property_id FROM listings WHERE id = :id AND organization_id = :org",
                 MapSqlParameterSource().addValue("id", id).addValue("org", principal.organizationId),
