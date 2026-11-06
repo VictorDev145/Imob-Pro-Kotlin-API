@@ -151,6 +151,64 @@ app.get("/accept-invitation", (_req, res) => {
   return res.type("html").send(invitationPage);
 });
 
+app.get("/reset-password", (_req, res) => {
+  res.set("Cache-Control", "no-store");
+  return res.type("html").send(resetPasswordPage);
+});
+
+const resetPasswordPage = `<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Redefinir senha · Imob-Pro</title>
+<style>
+*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#101820;color:#f5f3ed;font:16px system-ui,sans-serif}
+main{width:min(100%,460px);padding:32px;border:1px solid #39444c;border-radius:18px;background:#18232c;box-shadow:0 24px 80px #0006}
+h1{margin:0 0 8px;font-size:28px}p{color:#bdc7cc;line-height:1.5}label{display:block;margin:18px 0 7px;color:#dce2e4;font-size:14px}
+input{width:100%;padding:13px;border:1px solid #52616a;border-radius:9px;background:#101820;color:#fff;font:inherit}
+button{width:100%;margin-top:22px;padding:14px;border:0;border-radius:9px;background:#d9b56d;color:#17212a;font-weight:700;font-size:15px;cursor:pointer}
+#status{min-height:24px;margin-top:16px;font-size:14px}a{color:#e4c47f}
+</style>
+</head>
+<body><main>
+<div style="color:#d9b56d;font-size:12px;letter-spacing:2px;font-weight:700">IMOB-PRO</div>
+<h1>Redefinir senha</h1>
+<p>Escolha uma nova senha com pelo menos 12 caracteres. O link de recuperação é válido por 30 minutos e só pode ser usado uma vez.</p>
+<form id="resetForm">
+<label for="password">Nova senha</label>
+<input id="password" name="password" type="password" minlength="12" maxlength="72" autocomplete="new-password" required>
+<button id="submit" type="submit">Salvar nova senha</button>
+</form>
+<div id="status" role="status" aria-live="polite"></div>
+</main>
+<script>
+const form=document.getElementById("resetForm");
+const statusNode=document.getElementById("status");
+const submit=document.getElementById("submit");
+const token=new URLSearchParams(location.search).get("token");
+if(!token){statusNode.textContent="Link inválido ou incompleto.";form.hidden=true;}
+form.addEventListener("submit",async event=>{
+ event.preventDefault();submit.disabled=true;statusNode.textContent="Validando link…";
+ try{
+  const csrfResponse=await fetch("/api/csrf",{credentials:"same-origin"});
+  if(!csrfResponse.ok)throw new Error("Não foi possível iniciar a validação. Atualize a página.");
+  const csrf=await csrfResponse.json();
+  const response=await fetch("/api/auth/reset-password",{
+   method:"POST",credentials:"same-origin",
+   headers:{"content-type":"application/json","x-csrf-token":csrf.csrfToken},
+   body:JSON.stringify({token,password:document.getElementById("password").value})
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(result.error?.message||result.message||"Não foi possível redefinir a senha.");
+  form.hidden=true;
+  statusNode.innerHTML="Senha redefinida! <a href="/">Entrar no Imob-Pro</a>";
+ }catch(error){statusNode.textContent=error.message;submit.disabled=false;}
+});
+</script>
+</body></html>`;
+
+
 app.get("/api/csrf", (req, res) => {
   const token = csrfToken();
   res.cookie("imobpro.csrf", token, { httpOnly: false, secure: production, sameSite: "lax", path: "/" });
