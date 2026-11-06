@@ -186,6 +186,37 @@ class PublicViewService(private val jdbc: NamedParameterJdbcTemplate) {
         ).also { if (it == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND) }
     }
 
+    @Transactional
+    fun recordByPropertyId(organizationSlug: String, propertyId: UUID, request: PublicViewRequest) {
+        val sessionHash = request.sessionKey?.trim()?.takeIf { it.isNotBlank() }?.let(::digest)
+        jdbc.update(
+            """
+            INSERT INTO property_views (organization_id, property_id, session_hash, source)
+            SELECT p.organization_id, p.id, :sessionHash, :source
+            FROM properties p
+            JOIN organizations o ON o.id = p.organization_id
+            JOIN listings l ON l.property_id = p.id AND l.organization_id = p.organization_id
+            WHERE o.slug = :orgSlug AND o.status = 'ACTIVE'
+              AND p.id = :propertyId AND p.status = 'ACTIVE' AND p.archived_at IS NULL
+              AND l.status = 'PUBLISHED' AND l.channel = 'WEBSITE'
+              AND (
+                CAST(:sessionHash AS CHAR(64)) IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM property_views pv
+                    WHERE pv.organization_id = p.organization_id
+                      AND pv.property_id = p.id
+                      AND pv.session_hash = CAST(:sessionHash AS CHAR(64))
+                      AND pv.created_at >= CURRENT_DATE
+                )
+              )
+            """.trimIndent(),
+            MapSqlParameterSource()
+                .addValue("sessionHash", sessionHash)
+                .addValue("source", request.source)
+                .addValue("orgSlug", organizationSlug)
+                .addValue("propertyId", propertyId),
+        ).also { if (it == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND) }
+    }
+
     private fun digest(value: String): String =
         MessageDigest.getInstance("SHA-256")
             .digest(value.toByteArray(Charsets.UTF_8))
@@ -225,6 +256,20 @@ class PropertyAnalyticsController(private val service: DashboardAnalyticsService
 
     private fun Authentication.tenant(): TenantPrincipal =
         principal as? TenantPrincipal ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
+}
+
+@RestController
+@RequestMapping("/api/v1/public/{organizationSlug}/properties/{propertyId}/view")
+class PublicPropertyViewController(private val service: PublicViewService) {
+    @PostMapping
+    fun record(
+        @PathVariable organizationSlug: String,
+        @PathVariable propertyId: UUID,
+        @Valid @RequestBody request: PublicViewRequest,
+    ): Map<String, String> {
+        service.recordByPropertyId(organizationSlug, propertyId, request)
+        return mapOf("status" to "recorded")
+    }
 }
 
 @RestController
