@@ -45,5 +45,5 @@ After restore, run Flyway validation, API integration tests, row-count checks, a
 - Enforce HTTPS, strict host/origin allowlists, firewall database/Redis/object storage, and least-privilege service credentials.
 - Configure S3 versioning/encryption/lifecycle and object-access policy; pre-create the bucket.
 - Run antivirus/content scanning and image re-encoding in a controlled worker before serving untrusted uploads. This repository currently validates file signatures and size but does not yet provide malware scanning or image re-encoding.
-- Use external rate-limit storage when running multiple BFF replicas; the current BFF limiter is process-local and therefore not sufficient as a cluster-wide production control.
+- The BFF uses Redis-backed shared rate-limit counters for authentication and general API traffic; protect Redis with a strong secret, private networking, backups and availability monitoring.
 - Perform a penetration test and LGPD review before cutover.
