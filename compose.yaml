@@ -39,6 +39,32 @@ services:
       - "${API_PORT:-8080}:8080"
     volumes:
       - imobpro_uploads:/var/lib/imobpro/uploads
+  compat-bff:
+    build:
+      context: ./compat-bff
+    container_name: imob-pro-compat-bff
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      api:
+        condition: service_started
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: 3100
+      DATABASE_URL: postgres://${POSTGRES_USER:-imobpro}:${POSTGRES_PASSWORD:-imobpro_dev}@postgres:5432/${POSTGRES_DB:-imobpro}
+      KOTLIN_API_URL: http://api:8080
+      SESSION_SECRET: ${BFF_SESSION_SECRET:-development-only-change-this-session-secret-32}
+      PUBLIC_ORGANIZATION_SLUG: ${PUBLIC_ORGANIZATION_SLUG:-}
+      LEGACY_WEB_URL: ${LEGACY_WEB_URL:-http://host.docker.internal:3000}
+      TRUST_PROXY: ${BFF_TRUST_PROXY:-false}
+    ports:
+      - "${BFF_PORT:-3100}:3100"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3100/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 volumes:
   imobpro_postgres_data:
   imobpro_uploads:
