@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "test": "node --test"
+    "test": "node --check src/server.js && node --test"
   },
   "dependencies": {
     "connect-pg-simple": "^10.0.0",
