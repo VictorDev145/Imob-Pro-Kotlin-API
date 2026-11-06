@@ -54,6 +54,11 @@ As credenciais do Compose são exclusivamente para desenvolvimento. Não as reut
 | GET | /api/v1/properties/{propertyId} | Consultar imóvel |
 | PUT | /api/v1/properties/{propertyId} | Atualizar imóvel |
 | DELETE | /api/v1/properties/{propertyId} | Arquivar imóvel |
+| GET | /api/v1/leads | Listar leads |
+| POST | /api/v1/leads | Criar lead |
+| GET | /api/v1/leads/{leadId} | Consultar lead |
+| PATCH | /api/v1/leads/{leadId}/status | Atualizar status |
+| PATCH | /api/v1/leads/{leadId}/assignment | Atribuir membro |
 
 ## Multi-tenancy e segurança
 A associação usuário-empresa é explícita. O tenant ativo é resolvido a partir da sessão persistida e membership validada, nunca de um organization_id arbitrário enviado pelo cliente. Operações de domínio usam o organizationId do principal autenticado em cada consulta e alteração.
@@ -64,7 +69,7 @@ Hibernate permanece em `validate`; Flyway controla o schema. Tokens não são ar
 A suíte inclui teste unitário de health e teste de integração com PostgreSQL 17 via Testcontainers cobrindo registro, perfil, logout e tentativa de leitura cross-tenant. O GitHub Actions executa build/testes e ktlint. Consulte o status da execução antes de considerar qualquer entrega validada.
 
 ## Ainda não pronto para produção
-Faltam módulos do legado (imagens, anúncios, leads, CRM, visitas, tarefas, mensagens, notificações, automações e configurações), fluxo de convite/verificação/recuperação de conta, rate limiting, CORS allowlist, auditoria, gestão de arquivos, testes de carga, observabilidade e deploy. A integração com a interface original ainda precisa ser feita e validada por contrato.
+Faltam módulos do legado (imagens, anúncios, clientes, visitas, tarefas, mensagens, notificações, automações e configurações), fluxo de convite/verificação/recuperação de conta, rate limiting, CORS allowlist, auditoria, gestão de arquivos, testes de carga, observabilidade e deploy. A integração com a interface original ainda precisa ser feita e validada por contrato.
 
 ## Segurança
 Não publicar em produção antes de revisar configuração de segredos, CORS, rate limiting, política de criação de contas, recuperação de senha, logs sem dados sensíveis, backups, monitoramento e testes completos.
