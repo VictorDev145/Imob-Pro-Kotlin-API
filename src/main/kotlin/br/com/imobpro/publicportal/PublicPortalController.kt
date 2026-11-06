@@ -219,7 +219,7 @@ class PublicPortalService(
                 organization_id, trigger_key, resource_type, resource_id, actor_user_id, payload
             ) VALUES (
                 :org, 'LEAD_CREATED', 'LEAD', :lead, :actor,
-                jsonb_build_object('leadId', :lead, 'propertyId', :property)
+                jsonb_build_object('leadId', :lead, 'propertyId', CAST(:property AS UUID))
             )
             """.trimIndent(),
             MapSqlParameterSource().addValue("org", context.first)
