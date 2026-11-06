@@ -316,6 +316,10 @@ app.post("/api/auth/register", authLimiter, requireCsrf, async (req, res) => {
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível concluir o cadastro."); }
 });
 
+app.post("/api/auth/admin-recover", authLimiter, requireCsrf, async (_req, res) => {
+  return fail(res, 404, "ROUTE_NOT_AVAILABLE", "A recuperação administrativa por chave compartilhada foi desativada. Use recuperação individual de senha e o fluxo de convite/ownership.");
+});
+
 app.post("/api/auth/forgot-password", authLimiter, requireCsrf, async (req, res) => {
   try {
     return sendApiResult(res, await apiCall("/api/v1/auth/password/forgot", {
