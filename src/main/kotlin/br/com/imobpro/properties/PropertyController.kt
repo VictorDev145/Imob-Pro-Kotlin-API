@@ -26,6 +26,7 @@ import java.util.UUID
 @RequestMapping("/api/v1/properties")
 class PropertyController(private val propertyService: PropertyService) {
     @GetMapping
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
     fun list(
         authentication: Authentication,
         @RequestParam(defaultValue = "0") @Min(0) offset: Int,
@@ -35,6 +36,7 @@ class PropertyController(private val propertyService: PropertyService) {
     ): PropertyPage = propertyService.list(authentication.tenantPrincipal(), offset, limit, city, status)
 
     @GetMapping("/{propertyId}")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
     fun get(
         authentication: Authentication,
         @PathVariable propertyId: UUID,
