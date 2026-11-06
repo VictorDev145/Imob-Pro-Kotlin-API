@@ -36,7 +36,7 @@ data class CreateListingRequest(
 )
 
 data class ListingStatusRequest(
-    @field:Pattern(regexp = "DRAFT|PUBLISHED|PAUSED|ARCHIVED") val status: String,
+    @field:Pattern(regexp = "DRAFT|PENDING|PUBLISHED|PAUSED|SOLD|RENTED|ARCHIVED") val status: String,
 )
 
 data class ListingResponse(
@@ -139,6 +139,20 @@ class ListingService(
         }
     }
 
+    @Transactional
+    fun updateStatusByProperty(principal: TenantPrincipal, propertyId: UUID, status: String) {
+        val listingId = jdbc.query(
+            """
+            SELECT id FROM listings
+            WHERE property_id = :property AND organization_id = :org
+            ORDER BY updated_at DESC LIMIT 1
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("property", propertyId).addValue("org", principal.organizationId),
+            RowMapper { rs, _ -> rs.getObject("id", UUID::class.java) },
+        ).singleOrNull() ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        updateStatus(principal, listingId, status)
+    }
+
     private val mapper = RowMapper<ListingResponse> { rs, _ ->
         ListingResponse(
             rs.getObject("id", UUID::class.java),
@@ -180,6 +194,15 @@ class ListingController(private val service: ListingService) {
         authentication: Authentication,
         @Valid @RequestBody request: CreateListingRequest,
     ): ListingResponse = service.create(authentication.tenant(), request)
+
+    @PatchMapping("/by-property/{propertyId}/status")
+    @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    fun updateStatusByProperty(
+        authentication: Authentication,
+        @PathVariable propertyId: UUID,
+        @Valid @RequestBody request: ListingStatusRequest,
+    ) = service.updateStatusByProperty(authentication.tenant(), propertyId, request.status)
 
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER')")
