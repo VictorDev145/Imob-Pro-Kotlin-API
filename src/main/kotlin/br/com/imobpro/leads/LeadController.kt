@@ -34,7 +34,8 @@ class LeadController(private val leadService: LeadService) {
         @RequestParam(required = false)
         @Pattern(regexp = "NEW|CONTACTED|QUALIFIED|CONVERTED|LOST")
         status: String?,
-    ): LeadPage = leadService.list(authentication.tenantPrincipal(), offset, limit, status)
+        @RequestParam(defaultValue = "false") assignedToMe: Boolean,
+    ): LeadPage = leadService.list(authentication.tenantPrincipal(), offset, limit, status, assignedToMe)
 
     @GetMapping("/{leadId}")
     @PreAuthorize("hasAnyRole('OWNER', 'ADMIN', 'MANAGER', 'AGENT')")
