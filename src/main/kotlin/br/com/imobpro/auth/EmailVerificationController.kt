@@ -27,7 +27,7 @@ data class ConfirmEmailRequest(@field:NotBlank val token: String)
 class EmailVerificationService(
     private val jdbc: JdbcTemplate,
     private val mailSender: JavaMailSender,
-    @Value("\${app.public-base-url:http://localhost:3000}") private val publicBaseUrl: String,
+    @Value("\${app.public-base-url:http://localhost:3100}") private val publicBaseUrl: String,
     @Value("\${spring.mail.username:}") private val mailUsername: String,
 ) {
     private val random = SecureRandom()
