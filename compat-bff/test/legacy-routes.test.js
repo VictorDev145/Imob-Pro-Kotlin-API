@@ -64,3 +64,12 @@ test("property analytics compatibility handler preserves the legacy response con
     assert.ok(server.includes(field), `missing legacy analytics field: ${field}`);
   }
 });
+
+\ntest("activity compatibility adapter restores the legacy audit fields", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(server, /app\\.get\\("\\/api\\/admin\\/activity"/);
+  for (const field of ["user_id:", "user_name:", "entity_type:", "entity_id:", "details:", "created_at:"]) {
+    assert.ok(server.includes(field), `missing legacy activity field: ${field}`);
+  }
+  assert.match(server, /dashboard\\/activity\\?limit=100/);
+});
