@@ -44,6 +44,13 @@ jobs:
         run: docker build -t imob-pro-kotlin-api:ci .
       - name: Build compatibility BFF image
         run: docker build -t imob-pro-compat-bff:ci ./compat-bff
+      - name: Validate Windows startup script syntax
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile('scripts/dev/start-local.ps1', [ref]$tokens, [ref]$errors) | Out-Null
+          if ($errors.Count -gt 0) { $errors | Format-List; exit 1 }
       - name: Validate Compose configuration
         run: docker compose config --quiet
       - name: Build integrated web image
