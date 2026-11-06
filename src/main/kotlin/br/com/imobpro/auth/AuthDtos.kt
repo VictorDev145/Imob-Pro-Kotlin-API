@@ -26,3 +26,10 @@ data class TokenResponse(
     val refreshExpiresAt: Instant,
 )
 data class AuthenticatedUser(val userId: UUID, val organizationId: UUID, val email: String, val fullName: String, val role: String)
+
+data class OrganizationChoice(
+    val organizationId: UUID,
+    val name: String,
+    val slug: String,
+    val role: String,
+)
