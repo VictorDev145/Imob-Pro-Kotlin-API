@@ -9,7 +9,10 @@ test("compatibility route registry is explicit and does not invent fallbacks", (
     target: "/api/v1/dashboard/summary",
     method: "GET",
   });
-  assert.equal(matchLegacyRoute("DELETE", "/api/admin/users/123"), null);
+  assert.deepEqual(matchLegacyRoute("DELETE", "/api/admin/users/123"), {
+    target: "/api/v1/organizations/current/members/123",
+    method: "DELETE",
+  });
 });
 
 test("path parameters are encoded before forwarding", () => {
