@@ -1,6 +1,7 @@
 package br.com.imobpro.listings
 
 import br.com.imobpro.auth.TenantPrincipal
+import br.com.imobpro.automations.AutomationEventWriter
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
@@ -53,7 +54,10 @@ data class ListingResponse(
 )
 
 @Service
-class ListingService(private val jdbc: NamedParameterJdbcTemplate) {
+class ListingService(
+    private val jdbc: NamedParameterJdbcTemplate,
+    private val automationEvents: AutomationEventWriter,
+) {
     @Transactional
     fun create(principal: TenantPrincipal, request: CreateListingRequest): ListingResponse {
         val id = UUID.randomUUID()
@@ -112,6 +116,17 @@ class ListingService(private val jdbc: NamedParameterJdbcTemplate) {
                 .addValue("org", principal.organizationId),
         )
         if (changed == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        if (status == "PUBLISHED") {
+            val propertyId = jdbc.query(
+                "SELECT property_id FROM listings WHERE id = :id AND organization_id = :org",
+                MapSqlParameterSource().addValue("id", id).addValue("org", principal.organizationId),
+                RowMapper { rs, _ -> rs.getObject("property_id", UUID::class.java) },
+            ).single()
+            automationEvents.enqueue(
+                principal, "PROPERTY_PUBLISHED", "LISTING", id,
+                mapOf("propertyId" to propertyId),
+            )
+        }
     }
 
     private val mapper = RowMapper<ListingResponse> { rs, _ ->
