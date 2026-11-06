@@ -1,13 +1,13 @@
 package br.com.imobpro.properties
 
 import br.com.imobpro.auth.TenantPrincipal
+import java.util.UUID
 import org.springframework.http.HttpStatus
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import java.util.UUID
 
 @Service
 class PropertyService(private val jdbc: NamedParameterJdbcTemplate) {
