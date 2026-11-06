@@ -60,7 +60,7 @@ const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
 function legacyUser(user) {
   if (!user) return null;
-  return { id: user.userId || user.id, name: user.fullName || user.name, email: user.email, phone: user.phone || null, role: String(user.role || "").toLowerCase() };
+  return { id: user.userId || user.id, name: user.fullName || user.name, email: user.email, phone: user.phone || null, role: String(user.role || "").toUpperCase() === "PROPERTY_OWNER" ? "owner" : String(user.role || "").toLowerCase() };
 }
 
 function fail(res, status, code, message) {
@@ -985,13 +985,28 @@ app.patch("/api/admin/settings", requireCsrf, async (req, res) => {
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível salvar as configurações."); }
 });
 
+app.post("/api/admin/users", requireCsrf, async (req, res) => {
+  try {
+    const body = req.body || {};
+    const legacyRole = String(body.role || "").trim().toLowerCase();
+    const roleMap = { owner: "PROPERTY_OWNER", agent: "AGENT", manager: "MANAGER", admin: "ADMIN", customer: "CUSTOMER" };
+    const role = roleMap[legacyRole];
+    if (!role) return fail(res, 400, "INVALID_ROLE", "Papel de usuário inválido.");
+    const result = await authenticatedCall(req, "/api/v1/organizations/current/invitations", {
+      method: "POST",
+      body: { email: body.email, role },
+    });
+    return sendApiResult(res, result);
+  } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Não foi possível enviar o convite."); }
+});
+
 app.get("/api/admin/users", async (req, res) => {
   try {
     const result = await authenticatedCall(req, "/api/v1/organizations/current/members");
     if (result.status !== 200) return sendApiResult(res, result);
     return res.json((result.data || []).map(member => ({
       id: member.userId, name: member.fullName, email: member.email,
-      role: String(member.role || "").toLowerCase(), status: String(member.status || "").toLowerCase(),
+      role: String(member.role || "").toUpperCase() === "PROPERTY_OWNER" ? "owner" : String(member.role || "").toLowerCase(), phone: member.phone || "", status: String(member.status || "").toLowerCase(),
       joined_at: member.joinedAt,
     })));
   } catch { return fail(res, 502, "UPSTREAM_UNAVAILABLE", "Equipe indisponível."); }
