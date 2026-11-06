@@ -55,7 +55,14 @@ class AuthService(private val jdbc: JdbcTemplate, private val passwordEncoder: P
     @Transactional
     fun refresh(refreshToken: String): TokenResponse {
         val hash = digest(refreshToken)
-        val row = try { jdbc.queryForMap("SELECT user_id, organization_id FROM auth_sessions WHERE refresh_token_hash = ? AND revoked_at IS NULL AND refresh_expires_at > NOW()", hash) }
+        val row = try { jdbc.queryForMap("SELECT s.user_id, s.organization_id
+                 FROM auth_sessions s
+                 JOIN users u ON u.id = s.user_id
+                 JOIN organization_memberships m ON m.user_id = s.user_id AND m.organization_id = s.organization_id
+                 JOIN organizations o ON o.id = s.organization_id
+                 WHERE s.refresh_token_hash = ? AND s.revoked_at IS NULL AND s.refresh_expires_at > NOW()
+                   AND u.status = 'ACTIVE' AND m.status = 'ACTIVE' AND o.status = 'ACTIVE'
+                 FOR UPDATE OF s", hash) }
         catch (_: EmptyResultDataAccessException) { throw ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid refresh token") }
         val userId = row["user_id"] as UUID
         val organizationId = row["organization_id"] as UUID
