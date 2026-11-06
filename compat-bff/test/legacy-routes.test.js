@@ -81,3 +81,12 @@ test("message compatibility preserves legacy read and length behavior", () => {
   assert.match(server, /MESSAGE_TOO_LONG/);
   assert.match(server, /length > 2000/);
 });
+
+test("chat compatibility maps numeric contact IDs to stable UUID aliases", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.ok(server.includes("async function legacyIdForUser"));
+  assert.ok(server.includes("async function userIdForLegacyId"));
+  assert.ok(server.includes("id: await legacyIdForUser(person.userId)"));
+  assert.ok(server.includes("const recipientId = await userIdForLegacyId(legacyRecipientId)"));
+  assert.ok(server.includes("legacy_user_id_map"));
+});
