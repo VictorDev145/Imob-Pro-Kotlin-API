@@ -60,6 +60,7 @@ class SecurityConfig {
                         "/api/v1/auth/password/forgot",
                         "/api/v1/auth/password/reset",
                         "/api/v1/auth/invitations/accept",
+                        "/api/v1/auth/email-verification/confirm",
                     ).permitAll()
                     .requestMatchers(
                         "/api/v1/health",
