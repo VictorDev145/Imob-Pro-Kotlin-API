@@ -72,7 +72,7 @@ data class PublicListingPage(val items: List<PublicListing>, val offset: Int, va
 class PublicPortalService(
     private val jdbc: NamedParameterJdbcTemplate,
     private val objectMapper: ObjectMapper,
-    @Value("${imobpro.storage.local.root:./var/imobpro/uploads}") root: String,
+    @Value("\${imobpro.storage.local.root:./var/imobpro/uploads}") root: String,
 ) {
     private val storageRoot = Path.of(root).toAbsolutePath().normalize()
 
