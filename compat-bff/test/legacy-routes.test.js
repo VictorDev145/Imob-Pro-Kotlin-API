@@ -55,3 +55,12 @@ test("legacy route coverage manifest accounts for all 67 Express contracts", () 
   );
   assert.ok(coverage.every(item => ["adapter", "mapped", "disabled"].includes(item.status)));
 });
+
+test("property analytics compatibility handler preserves the legacy response contract", () => {
+  const server = readFileSync(new URL("../src/server.js", import.meta.url), "utf8");
+  assert.match(server, /app\.get\("\/api\/admin\/property-analytics\/:id"/);
+  assert.match(server, /"\/api\/v1\/analytics\/properties\/" \+ encodeURIComponent\(req\.params\.id\)/);
+  for (const field of ["property:", "total:", "unique:", "favorites:", "leads:", "visits:"]) {
+    assert.ok(server.includes(field), `missing legacy analytics field: ${field}`);
+  }
+});
