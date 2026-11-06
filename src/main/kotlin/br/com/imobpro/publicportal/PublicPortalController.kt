@@ -84,6 +84,13 @@ class PublicPortalService(
         limit: Int,
         purpose: String?,
         city: String?,
+        neighborhood: String?,
+        propertyType: String?,
+        minPrice: java.math.BigDecimal?,
+        maxPrice: java.math.BigDecimal?,
+        bedrooms: Int?,
+        parkingSpaces: Int?,
+        q: String?,
     ): PublicListingPage {
         validateOrganization(organizationSlug)
         val parameters = MapSqlParameterSource()
@@ -98,6 +105,34 @@ class PublicPortalService(
         if (!city.isNullOrBlank()) {
             filters.add("LOWER(p.city) = LOWER(:city)")
             parameters.addValue("city", city.trim())
+        }
+        if (!neighborhood.isNullOrBlank()) {
+            filters.add("p.neighborhood ILIKE :neighborhood")
+            parameters.addValue("neighborhood", "%" + neighborhood.trim() + "%")
+        }
+        if (!propertyType.isNullOrBlank()) {
+            filters.add("p.property_type = :propertyType")
+            parameters.addValue("propertyType", propertyType)
+        }
+        if (minPrice != null) {
+            filters.add("(p.sale_price >= :minPrice OR p.rent_price >= :minPrice)")
+            parameters.addValue("minPrice", minPrice)
+        }
+        if (maxPrice != null) {
+            filters.add("(p.sale_price <= :maxPrice OR p.rent_price <= :maxPrice)")
+            parameters.addValue("maxPrice", maxPrice)
+        }
+        if (bedrooms != null) {
+            filters.add("COALESCE(p.bedrooms, 0) >= :bedrooms")
+            parameters.addValue("bedrooms", bedrooms)
+        }
+        if (parkingSpaces != null) {
+            filters.add("COALESCE(p.parking_spaces, 0) >= :parkingSpaces")
+            parameters.addValue("parkingSpaces", parkingSpaces)
+        }
+        if (!q.isNullOrBlank()) {
+            filters.add("(p.title ILIKE :query OR COALESCE(p.description, '') ILIKE :query OR COALESCE(p.neighborhood, '') ILIKE :query)")
+            parameters.addValue("query", "%" + q.trim() + "%")
         }
         val extra = filters.joinToString(" AND ", if (filters.isEmpty()) "" else " AND ")
         val rows = jdbc.query(
@@ -337,12 +372,26 @@ class PublicPortalController(private val service: PublicPortalService) {
         @RequestParam(defaultValue = "24") limit: Int,
         @RequestParam(required = false) purpose: String?,
         @RequestParam(required = false) city: String?,
+        @RequestParam(required = false) neighborhood: String?,
+        @RequestParam(required = false) propertyType: String?,
+        @RequestParam(required = false) minPrice: java.math.BigDecimal?,
+        @RequestParam(required = false) maxPrice: java.math.BigDecimal?,
+        @RequestParam(required = false) bedrooms: Int?,
+        @RequestParam(required = false) parkingSpaces: Int?,
+        @RequestParam(required = false) q: String?,
     ): PublicListingPage {
         if (offset < 0 || limit !in 1..100) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
-        if (purpose != null && purpose !in setOf("SALE", "RENT", "BOTH")) {
+        if (purpose != null && purpose !in setOf("SALE", "RENT", "BOTH")) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        if (propertyType != null && propertyType !in setOf("HOUSE", "APARTMENT", "LAND", "COMMERCIAL", "RURAL", "OTHER")) {
             throw ResponseStatusException(HttpStatus.BAD_REQUEST)
         }
-        return service.list(organizationSlug, offset, limit, purpose, city)
+        if ((minPrice != null && minPrice.signum() < 0) || (maxPrice != null && maxPrice.signum() < 0) ||
+            (minPrice != null && maxPrice != null && minPrice > maxPrice) ||
+            (bedrooms != null && bedrooms < 0) || (parkingSpaces != null && parkingSpaces < 0) ||
+            (neighborhood?.length ?: 0) > 100 || (q?.length ?: 0) > 120) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        }
+        return service.list(organizationSlug, offset, limit, purpose, city, neighborhood, propertyType, minPrice, maxPrice, bedrooms, parkingSpaces, q)
     }
 
     @GetMapping("/listings/by-property/{propertyId}")
