@@ -117,7 +117,7 @@ class ProfileAndPrivacyService(private val jdbc: NamedParameterJdbcTemplate) {
         )
         val searches = jdbc.queryForList(
             """
-            SELECT id, name, criteria, alerts_enabled, created_at
+            SELECT id, name, criteria::text AS criteria, alerts_enabled, created_at
             FROM saved_searches WHERE organization_id = :org AND user_id = :user
             ORDER BY created_at DESC
             """.trimIndent(),
