@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Email
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Size
 import org.springframework.beans.factory.annotation.Value
+import com.fasterxml.jackson.databind.ObjectMapper
 import org.springframework.core.io.FileSystemResource
 import org.springframework.core.io.Resource
 import org.springframework.http.HttpStatus
@@ -70,6 +71,7 @@ data class PublicListingPage(val items: List<PublicListing>, val offset: Int, va
 @Service
 class PublicPortalService(
     private val jdbc: NamedParameterJdbcTemplate,
+    private val objectMapper: ObjectMapper,
     @Value("${imobpro.storage.local.root:./var/imobpro/uploads}") root: String,
 ) {
     private val storageRoot = Path.of(root).toAbsolutePath().normalize()
@@ -209,6 +211,19 @@ class PublicPortalService(
                 .addValue("email", request.email?.trim()?.lowercase())
                 .addValue("phone", request.phone.trim())
                 .addValue("message", request.message)
+                .addValue("property", context.third),
+        )
+        jdbc.update(
+            """
+            INSERT INTO automation_events (
+                organization_id, trigger_key, resource_type, resource_id, actor_user_id, payload
+            ) VALUES (
+                :org, 'LEAD_CREATED', 'LEAD', :lead, :actor,
+                jsonb_build_object('leadId', :lead, 'propertyId', :property)
+            )
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", context.first)
+                .addValue("lead", leadId).addValue("actor", context.second)
                 .addValue("property", context.third),
         )
         jdbc.update(
