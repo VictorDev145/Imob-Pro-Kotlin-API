@@ -38,6 +38,18 @@ data class CreateAutomationRequest(
 
 data class SetAutomationEnabledRequest(val enabled: Boolean)
 
+data class AutomationEventResponse(
+    val id: UUID,
+    val triggerKey: String,
+    val resourceType: String,
+    val resourceId: UUID?,
+    val status: String,
+    val attempts: Int,
+    val lastError: String?,
+    val createdAt: Instant,
+    val processedAt: Instant?,
+)
+
 data class AutomationResponse(
     val id: UUID,
     val name: String,
@@ -116,6 +128,45 @@ class AutomationService(
         if (changed == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND)
     }
 
+    fun events(principal: TenantPrincipal, limit: Int): List<AutomationEventResponse> =
+        jdbc.query(
+            """
+            SELECT id, trigger_key, resource_type, resource_id, status,
+                   attempts, last_error, created_at, processed_at
+            FROM automation_events
+            WHERE organization_id = :org
+            ORDER BY created_at DESC LIMIT :limit
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("org", principal.organizationId).addValue("limit", limit),
+            RowMapper { rs, _ ->
+                AutomationEventResponse(
+                    rs.getObject("id", UUID::class.java),
+                    rs.getString("trigger_key"),
+                    rs.getString("resource_type"),
+                    rs.getObject("resource_id", UUID::class.java),
+                    rs.getString("status"),
+                    rs.getInt("attempts"),
+                    rs.getString("last_error"),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getTimestamp("processed_at")?.toInstant(),
+                )
+            },
+        )
+
+    @Transactional
+    fun retryEvent(principal: TenantPrincipal, eventId: UUID) {
+        val changed = jdbc.update(
+            """
+            UPDATE automation_events
+            SET status = 'PENDING', attempts = 0, last_error = NULL,
+                available_at = NOW(), processed_at = NULL
+            WHERE id = :id AND organization_id = :org AND status = 'FAILED'
+            """.trimIndent(),
+            MapSqlParameterSource().addValue("id", eventId).addValue("org", principal.organizationId),
+        )
+        if (changed == 0) throw ResponseStatusException(HttpStatus.NOT_FOUND)
+    }
+
     @Transactional
     fun delete(principal: TenantPrincipal, id: UUID) {
         val changed = jdbc.update(
@@ -153,6 +204,20 @@ class AutomationController(private val service: AutomationService) {
         authentication: Authentication,
         @Valid @RequestBody request: CreateAutomationRequest,
     ): AutomationResponse = service.create(authentication.tenant(), request)
+
+    @GetMapping("/events")
+    fun events(
+        authentication: Authentication,
+        @org.springframework.web.bind.annotation.RequestParam(defaultValue = "50") limit: Int,
+    ): List<AutomationEventResponse> {
+        if (limit !in 1..100) throw ResponseStatusException(HttpStatus.BAD_REQUEST)
+        return service.events(authentication.tenant(), limit)
+    }
+
+    @PostMapping("/events/{eventId}/retry")
+    @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
+    fun retryEvent(authentication: Authentication, @PathVariable eventId: UUID) =
+        service.retryEvent(authentication.tenant(), eventId)
 
     @PatchMapping("/{id}/enabled")
     @org.springframework.web.bind.annotation.ResponseStatus(HttpStatus.NO_CONTENT)
